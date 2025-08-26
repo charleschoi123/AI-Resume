@@ -1,216 +1,184 @@
-<!doctype html>
-<html lang="zh-CN">
+<!DOCTYPE html>
+<html lang="zh">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Alsos NeuroMatch · 求职助手</title>
-<style>
-  :root{
-    --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af;
-    --accent:#22d3ee; --ok:#10b981; --warn:#f59e0b; --danger:#ef4444;
-    --border:#1f2937;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto}
-  .wrap{max-width:1100px;margin:32px auto;padding:0 16px}
-  h1{font-size:22px;margin:0 0 16px}
-  .grid{display:grid;gap:12px}
-  .g2{grid-template-columns:1fr 1fr}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
-  label{display:block;margin:8px 0 6px;color:#cbd5e1}
-  textarea,input,select{
-    width:100%;color:var(--text);background:#0b1220;border:1px solid var(--border);
-    border-radius:10px;padding:10px 12px;outline:none
-  }
-  textarea{min-height:130px;resize:vertical}
-  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-  button{
-    background:#111827;border:1px solid var(--border);color:var(--text);
-    border-radius:10px;padding:10px 14px;cursor:pointer
-  }
-  button.primary{background:var(--accent);color:#001018;border:0}
-  .bar{height:6px;background:#0b1220;border:1px solid var(--border);border-radius:999px;overflow:hidden;margin:8px 0 6px}
-  .bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#22d3ee,#14b8a6)}
-  .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .sec h3{margin:0 0 8px;font-size:16px}
-  .klist{margin:0;padding-left:18px}
-  .kbadge{display:inline-block;padding:2px 8px;border-radius:999px;background:#0b1220;border:1px solid var(--border);margin:3px 6px 0 0;color:#cbd5e1}
-  details{margin-top:8px}
-  pre{white-space:pre-wrap;background:#0b1220;border:1px solid var(--border);border-radius:10px;padding:10px}
-  .muted{color:var(--muted)}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Alsos AI Resume · 求职助手</title>
+  <style>
+    :root{
+      --bg:#F3F2EF;          /* 类 LinkedIn 背景灰 */
+      --card:#FFFFFF;        /* 卡片白 */
+      --text:#111827;        /* 主文本 */
+      --muted:#6B7280;       /* 次文本 */
+      --border:#E5E7EB;      /* 边框灰 */
+      --brand:#0D3B2E;       /* 深绿主色 */
+      --brand-weak:#E7F0ED;  /* 主色浅底 */
+      --accent:#C9A227;      /* 点缀色（可选） */
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; background:var(--bg); color:var(--text); font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif;
+    }
+    .topbar{
+      height:56px; background:var(--card); border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between; padding:0 16px; position:sticky; top:0; z-index:10;
+    }
+    .brand{ font-weight:800; letter-spacing:.3px; color:var(--brand); }
+    .hint{ color:var(--muted); font-size:12px }
+
+    .container{ max-width:1100px; margin:16px auto; padding:0 12px; display:grid; grid-template-columns: 360px 1fr; gap:16px; }
+    @media (max-width: 980px){ .container{ grid-template-columns: 1fr; } }
+
+    .card{
+      background:var(--card); border:1px solid var(--border); border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.03);
+    }
+    .card .section-title{
+      padding:14px 16px; font-weight:700; border-bottom:1px solid var(--border); color:var(--brand);
+    }
+    .card .body{ padding:14px 16px; }
+    .row{ display:flex; gap:10px; margin-bottom:10px; }
+    input[type=text], textarea{
+      width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:#FAFAFA; outline:none;
+    }
+    textarea{ min-height:140px; resize:vertical; }
+    .muted{ color:var(--muted); font-size:12px; }
+
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:10px 14px; border-radius:10px; border:1px solid transparent; cursor:pointer; user-select:none;
+      transition:all .15s ease;
+    }
+    .btn-primary{ background:var(--brand); color:#fff; }
+    .btn-primary:hover{ opacity:.9; }
+    .btn-ghost{ background:#EEF2F3; color:var(--brand); border-color:#DDE4E6; }
+    .btn-ghost:hover{ background:#E7ECEE; }
+
+    .feed .item{ margin-bottom:14px; overflow:hidden; }
+    .feed .item .title{ padding:12px 16px; font-weight:700; color:var(--brand); border-bottom:1px solid var(--border); }
+    .feed .item .content{ padding:14px 16px; line-height:1.6; }
+    .pill{ display:inline-block; padding:4px 8px; background:var(--brand-weak); border-radius:999px; margin-right:6px; margin-bottom:6px; }
+    .scorebar{
+      height:10px; background:#EEF2F3; border-radius:999px; overflow:hidden; margin-top:6px; border:1px solid var(--border);
+    }
+    .scorebar > span{ display:block; height:100%; background:var(--brand); }
+
+    .skeleton{ animation: pulse 1.2s infinite ease-in-out; background:#EAECEE; height:14px; border-radius:8px; margin:8px 0; }
+    @keyframes pulse{ 0%{opacity:.8} 50%{opacity:.4} 100%{opacity:.8} }
+
+    .banner{ background:#fffce7; border:1px solid #f3e7a6; color:#8b6a00; padding:8px 12px; border-radius:10px; margin-bottom:12px; font-size:13px; }
+    .error{ background:#fff1f1; border:1px solid #ffd0d0; color:#a20000; padding:10px 12px; border-radius:10px; margin-bottom:12px; }
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Alsos NeuroMatch · 求职助手</h1>
-
-  <div class="card">
-    <div class="grid g2">
-      <div>
-        <label>① 粘贴你的简历文本（支持中文）</label>
-        <textarea id="resume" placeholder="粘贴 Word/PDF 里的纯文本…"></textarea>
-      </div>
-      <div>
-        <div class="grid">
-          <div>
-            <label>目标职位</label>
-            <input id="title" placeholder="如：资深产品经理 / 财务总监"/>
-          </div>
-          <div>
-            <label>期望地点</label>
-            <input id="city" placeholder="如：上海 / 深圳"/>
-          </div>
-          <div>
-            <label>目标行业（可选）</label>
-            <input id="industry" placeholder="如：互联网 / 医疗 / 制造"/>
-          </div>
-        </div>
-        <label style="margin-top:8px">目标职位 JD（可选，用于 ATS 评分）</label>
-        <textarea id="jd" placeholder="粘贴 JD 原文；留空则不做 ATS 评分"></textarea>
-      </div>
-    </div>
-
-    <div class="btns">
-      <button class="primary" onclick="runFull()">一键生成报告</button>
-      <button onclick="exportPDF()">导出 PDF</button>
-      <button onclick="exportDOCX()">导出 DOCX</button>
-    </div>
-    <div class="bar"><i id="pbar"></i></div>
-    <div class="muted">提示：首次生成可能较慢（冷启动 + LLM 计算），属正常。</div>
+  <div class="topbar">
+    <div class="brand">Alsos AI Resume</div>
+    <div class="hint" id="cacheHint" style="display:none;">已加载上次结果 · <a href="#" id="btnClearCache">清空缓存</a></div>
   </div>
 
-  <div id="out" class="grid" style="margin-top:12px;gap:12px"></div>
-</div>
-
-<script>
-/* ====== 小工具 ====== */
-function setBar(v){ document.getElementById('pbar').style.width = Math.max(0,Math.min(100,v)) + '%'; }
-const esc = s => (s||"").toString().replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
-const li = s => `<li>${esc(s)}</li>`;
-const list = arr => `<ul class="klist">${(arr||[]).map(x=>li(typeof x==='string'?x:JSON.stringify(x))).join('')}</ul>`;
-const badges = arr => `<div>${(arr||[]).map(x=>`<span class="kbadge">${esc(x)}</span>`).join('')}</div>`;
-const jsonBox = (obj,label="查看原始 JSON") => `<details><summary>${label}</summary><pre>${esc(JSON.stringify(obj,null,2))}</pre></details>`;
-
-/* ====== 渲染报告 ====== */
-function renderReport(data){
-  const box = document.getElementById('out');
-  const R = data.resume_optimization || {};
-  const I = data.interview || {};
-  const C = data.career_plan || {};
-  const hasATS = !!data.ats;
-
-  const card1 = `
-  <div class="card sec">
-    <h3>报告 · 简历优化</h3>
-    <div class="cols">
-      <div>
-        <div class="muted">建议增加的要点</div>${list(R.bullets_to_add)}
-        <div class="muted" style="margin-top:8px">建议压缩/改写</div>${list(R.bullets_to_tighten)}
-        <div class="muted" style="margin-top:8px">推荐板块顺序</div>${badges(R.section_order)}
-      </div>
-      <div>
-        <div class="muted">核心技能关键词</div>${badges(R.skills_keywords_core)}
-        <div class="muted" style="margin-top:8px">中文简介</div><pre>${esc(R.summary_cn)}</pre>
-        <div class="muted" style="margin-top:8px">英文简介</div><pre>${esc(R.summary_en)}</pre>
+  <div class="container">
+    <!-- 左侧：输入 -->
+    <div class="card">
+      <div class="section-title">输入区</div>
+      <div class="body">
+        <div class="row">
+          <input type="file" id="resumeFile" accept=".txt,.docx" />
+        </div>
+        <div class="row">
+          <textarea id="resumeText" placeholder="① 直接粘贴简历文本（支持中文）&#10;② 或上传 .txt / .docx 自动填充"></textarea>
+        </div>
+        <div class="row">
+          <input id="targetTitle" type="text" placeholder="目标职位，如：产品经理 / 财务总监" />
+        </div>
+        <div class="row">
+          <input id="targetLocation" type="text" placeholder="期望地点，如：上海 / 深圳" />
+        </div>
+        <div class="row">
+          <input id="targetIndustry" type="text" placeholder="目标行业（可选），如：互联网 / 医药 / 制造" />
+        </div>
+        <div class="row">
+          <textarea id="jobDescription" placeholder="目标职位 JD（可选，用于 ATS 评分）"></textarea>
+        </div>
+        <div class="row" style="gap:8px;">
+          <button class="btn btn-primary" id="btnGenerate">一键生成报告</button>
+          <button class="btn btn-ghost" id="btnClear">清空输入</button>
+        </div>
+        <div class="muted">提示：首次生成可能较慢（冷启动 + LLM 计算），属正常。</div>
       </div>
     </div>
-    ${jsonBox(R)}
-  </div>`;
 
-  const card2 = `
-  <div class="card sec">
-    <h3>报告 · 面试问答</h3>
-    <div class="cols">
-      <div>
-        <div class="muted">高频问题</div>${list(I.top_questions)}
-      </div>
-      <div>
-        <div class="muted">面试提示</div>${list(I.tips)}
-        <div class="muted" style="margin-top:8px">训练/作业</div>${list(I.drills)}
+    <!-- 右侧：结果 feed -->
+    <div class="feed">
+      <div id="alertArea"></div>
+      <div id="feedArea">
+        <!-- 动态渲染 -->
       </div>
     </div>
-    ${jsonBox(I)}
-  </div>`;
+  </div>
 
-  const card3 = `
-  <div class="card sec">
-    <h3>报告 · 职业建议（3-5年）</h3>
-    ${(C.career_paths||[]).map(p=>`
-      <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--border)">
-        <div class="muted">方向</div><pre>${esc(p.title||'')}</pre>
-        <div class="muted">Why now</div><pre>${esc(p.why_now||'')}</pre>
-        <div class="muted">90 天行动</div>${list(p.90_day_plan||p['90_day_plan']||[])}
-        <div class="muted">需补齐的能力/经验</div>${list(p.gap_to_fill||[])}
-        <div class="muted">要建立的人脉</div>${list(p.network_to_build||[])}
-        <div class="muted">要学习的技能</div>${list(p.skills_to_learn||[])}
-      </div>
-    `).join('')}
-    ${jsonBox(C)}
-  </div>`;
+  <script>
+    const $ = sel => document.querySelector(sel);
+    const feed = $("#feedArea");
+    const alertArea = $("#alertArea");
+    const cacheKey = "alsos_last_report_v1";
 
-  const card4 = hasATS ? `
-  <div class="card sec">
-    <h3>报告 · ATS 匹配（若提供 JD）</h3>
-    <div class="muted">ATS 评分</div><div style="font-size:22px;color:var(--ok);font-weight:600">${esc(data.ats.score)} / 100</div>
-    <div class="muted" style="margin-top:8px">亮点</div>${list(data.ats.highlights||[])}
-    <div class="muted" style="margin-top:8px">关键词建议</div>${badges(data.ats.keywords||[])}
-    <div class="muted" style="margin-top:8px">不匹配/补救</div>${list(data.ats.mismatch||[])}
-    ${jsonBox(data.ats)}
-  </div>` : '';
-
-  box.innerHTML = card1 + card2 + card3 + card4;
-}
-
-/* ====== 生成报告（含重试 & 解析原文） ====== */
-async function runFull(){
-  try{
-    setBar(8);
-    const payload = {
-      resume_text:    (document.getElementById('resume')||{}).value || '',
-      target_title:   (document.getElementById('title')||{}).value  || '',
-      target_city:    (document.getElementById('city')||{}).value   || '',
-      target_industry:(document.getElementById('industry')||{}).value||'',
-      jd_text:        (document.getElementById('jd')||{}).value     || ''
-    };
-
-    const doFetch = async () => {
-      const res = await fetch('/full_report', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(payload),
-        credentials:'same-origin',
-        cache:'no-store'
-      });
-      const raw = await res.text();
-      if(!res.ok) throw new Error(`HTTP ${res.status} — ${raw.slice(0,500)}`);
-      try{
-        return JSON.parse(raw);
-      }catch(e){
-        throw new Error(`服务端返回的不是有效 JSON：${e.message}\n片段：${raw.slice(0,500)}`);
-      }
-    };
-
-    setBar(20);
-    let data;
-    try{
-      data = await doFetch();
-    }catch(e1){
-      console.warn('第一次失败，重试一次：', e1);
-      await new Promise(r=>setTimeout(r,1500));
-      data = await doFetch();
+    function showBannerCache(){
+      const has = !!localStorage.getItem(cacheKey);
+      $("#cacheHint").style.display = has ? "block" : "none";
     }
-    setBar(85);
-    renderReport(data);
-    setBar(100);
-  }catch(err){
-    alert(`生成失败： ${err.message||err}`);
-    setBar(0);
-  }
-}
 
-/* ====== 导出（占位：你后面接入 html2pdf/docx 即可） ====== */
-function exportPDF(){ alert('PDF 导出占位：后续接入 html2pdf.js 即可。'); }
-function exportDOCX(){ alert('DOCX 导出占位：后续接入 docx 库或后端生成。'); }
-</script>
-</body>
-</html>
+    function skeleton(){
+      feed.innerHTML = `
+        <div class="card item"><div class="title">正在生成报告</div>
+          <div class="content">
+            <div class="skeleton" style="width:80%"></div>
+            <div class="skeleton" style="width:90%"></div>
+            <div class="skeleton" style="width:60%"></div>
+          </div>
+        </div>
+        <div class="card item"><div class="title">请稍候</div>
+          <div class="content">
+            <div class="skeleton" style="width:95%"></div>
+            <div class="skeleton" style="width:70%"></div>
+            <div class="skeleton" style="width:85%"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function pillList(arr){
+      return (arr||[]).map(x => `<span class="pill">${escapeHtml(x)}</span>`).join("");
+    }
+
+    function scoreBar(v){ const clamped = Math.max(0, Math.min(100, Number(v||0))); return `
+      <div class="scorebar"><span style="width:${clamped}%"></span></div>
+      <div class="muted">${clamped}/100</div>`;}
+
+    function card(title, html){
+      return `<div class="card item">
+        <div class="title">${title}</div>
+        <div class="content">${html}</div>
+      </div>`;
+    }
+
+    function renderReport(data){
+      alertArea.innerHTML = "";
+      const d = data.data;
+      const meta = d.meta || {};
+      const ats  = d.ats  || {};
+
+      const overview = `
+        <div class="banner">耗时：${(meta.elapsed_ms||0)} ms · 引擎：${meta.model_alias||"Alsos AI Resume"}</div>
+        <div class="muted">若提供 JD 将生成 ATS 匹配评分；未提供则不做 ATS。</div>`;
+
+      const summary = `<p>${escapeHtml(d.summary||"")}</p>`;
+      const highlights = pillList(d.highlights);
+      const keywords = pillList(d.keywords);
+
+      const career = `
+        <div><b>短期：</b><ul>${(d.career_suggestions?.short_term||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
+        <div><b>中期：</b><ul>${(d.career_suggestions?.mid_term||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
+        <div><b>长期：</b><ul>${(d.career_suggestions?.long_term||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>`;
+
+      const interview = `
+        <div><b>通用问题：</b><ul>${(d.interview_prep?.general||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
+        <d
