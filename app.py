@@ -1,4 +1,4 @@
-import os, json, hashlib
+import os, json, hashlib, re
 from flask import Flask, request, jsonify, render_template
 import requests
 
@@ -11,47 +11,54 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 MODEL_NAME = os.getenv("MODEL_NAME", "deepseek-chat")
 
-HEADERS = {
-    "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-    "Content-Type": "application/json"
-}
-
-# 简单内存缓存（同样请求24h内复用，降费用）
+HEADERS = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
 CACHE = {}
 
 def _sig(payload: dict) -> str:
-    """生成请求签名（用于缓存键）"""
     return hashlib.md5(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+# ========================
+# 安全 JSON 解析（自修复）
+# ========================
+def load_json_strict(s: str):
+    """
+    将模型文本尽力清洗为合法 JSON：
+    - 去掉 ```/```json 代码围栏
+    - 抓取首个 { ... } 块
+    - 去掉末尾多余逗号
+    - 报错时把片段返回，便于定位
+    """
+    if not isinstance(s, str):
+        raise RuntimeError("LLM返回的非字符串内容")
+    t = s.strip()
+    # 去除markdown代码围栏
+    t = re.sub(r"^```(?:json)?\s*|\s*```$", "", t, flags=re.IGNORECASE | re.MULTILINE)
+    # 抓取第一个花括号JSON块
+    m = re.search(r"\{.*\}", t, flags=re.S)
+    if m:
+        t = m.group(0)
+    # 删除对象/数组前的多余逗号 ,}
+    t = re.sub(r",\s*([}\]])", r"\1", t)
+    # 删除不可见控制字符
+    t = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", t)
+    try:
+        return json.loads(t)
+    except Exception as e:
+        raise RuntimeError(f"模型未返回有效JSON: {e} | 片段: {t[:200]}...")
 
 # ========================
 # 调用大模型（带稳健报错）
 # ========================
 def ds_chat(messages, max_tokens=700, response_json=True, temperature=0.2, timeout=60):
-    """
-    与模型对话。任何后端/配额/鉴权错误都会抛成 RuntimeError，
-    由路由捕获并以 {"error": "..."} 返回到前端。
-    """
     if not DEEPSEEK_API_KEY:
         raise RuntimeError("缺少 API Key：请在 Render 环境变量中配置 DEEPSEEK_API_KEY")
-
-    body = {
-        "model": MODEL_NAME,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens
-    }
+    body = {"model": MODEL_NAME, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
     if response_json:
         body["response_format"] = {"type": "json_object"}
-
     try:
-        r = requests.post(
-            f"{OPENAI_BASE_URL}/v1/chat/completions",
-            headers=HEADERS,
-            data=json.dumps(body),
-            timeout=timeout
-        )
+        r = requests.post(f"{OPENAI_BASE_URL}/v1/chat/completions",
+                          headers=HEADERS, data=json.dumps(body), timeout=timeout)
         if r.status_code != 200:
-            # 把错误打印到日志里，也向前端抛出可读信息
             print("LLM_ERROR_STATUS", r.status_code, r.text[:500])
             raise RuntimeError(f"LLM HTTP {r.status_code}: {r.text[:300]}")
         data = r.json()
@@ -75,30 +82,25 @@ def health():
 
 # ========================
 # 子能力：解析 / 优化 / ATS / 面试 / 职业建议
-# （保留单接口，便于后续单独调用）
 # ========================
 @app.post("/parse_resume")
 def parse_resume():
     try:
         js = request.get_json(force=True)
         text = (js.get("resume_text") or "").strip()
-        if len(text) > 25000:
-            text = text[:25000]
-
+        if len(text) > 25000: text = text[:25000]
         payload = {"resume_text": text}
-        key = _sig({"route": "parse_resume", **payload})
-        if key in CACHE:
-            return jsonify(CACHE[key])
+        key = _sig({"route":"parse_resume", **payload})
+        if key in CACHE: return jsonify(CACHE[key])
 
         messages = [
-            {"role": "system", "content": (
+            {"role":"system","content":(
                 "你是ATS解析器。将输入的中文/英文简历文本解析为结构化JSON："
                 "{basics, summary, education[], experiences[], skills_core[], skills_optional[], keywords[]}。"
-                "时间用YYYY-MM；experiences[].bullets 每条≤30字并量化；只输出JSON。"
-            )},
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}
+                "时间用YYYY-MM；experiences[].bullets 每条≤30字并量化；只输出JSON。")},
+            {"role":"user","content": json.dumps(payload, ensure_ascii=False)}
         ]
-        data = json.loads(ds_chat(messages, max_tokens=600, response_json=True))
+        data = load_json_strict(ds_chat(messages, max_tokens=600, response_json=True))
         CACHE[key] = data
         return jsonify(data)
     except Exception as e:
@@ -114,20 +116,18 @@ def resume_optimize():
             "target_industry": js.get("target_industry", ""),
             "language": js.get("language", "zh")
         }
-        key = _sig({"route": "resume_optimize", **payload})
-        if key in CACHE:
-            return jsonify(CACHE[key])
+        key = _sig({"route":"resume_optimize", **payload})
+        if key in CACHE: return jsonify(CACHE[key])
 
         messages = [
-            {"role": "system", "content": (
+            {"role":"system","content":(
                 "你是顶级简历教练。基于 resume_struct，输出可直接用于替换的内容，仅输出JSON："
                 "{section_order[], summary_cn, summary_en, bullets_to_add[], bullets_to_tighten[], "
                 "skills_keywords_core[], skills_keywords_optional[], title_suggestions[]}。"
-                "策略：动词+量化；行业中性；避免夸张。"
-            )},
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}
+                "策略：动词+量化；行业中性；避免夸张。")},
+            {"role":"user","content": json.dumps(payload, ensure_ascii=False)}
         ]
-        data = json.loads(ds_chat(messages, max_tokens=800, response_json=True))
+        data = load_json_strict(ds_chat(messages, max_tokens=800, response_json=True))
         CACHE[key] = data
         return jsonify(data)
     except Exception as e:
@@ -140,22 +140,19 @@ def ats_score():
         payload = {
             "resume_struct": js.get("resume_struct", {}),
             "jd_text": js.get("jd_text", ""),
-            "scoring_weights": js.get("scoring_weights", {"keywords": 0.6, "responsibilities": 0.25, "nice_to_have": 0.15})
+            "scoring_weights": js.get("scoring_weights", {"keywords":0.6,"responsibilities":0.25,"nice_to_have":0.15})
         }
-        key = _sig({"route": "ats_score", **payload})
-        if key in CACHE:
-            return jsonify(CACHE[key])
+        key = _sig({"route":"ats_score", **payload})
+        if key in CACHE: return jsonify(CACHE[key])
 
         messages = [
-            {"role": "system", "content": (
+            {"role":"system","content":(
                 "你是ATS评分器。比较 resume_struct 与 jd_text，输出JSON："
                 "{match_score, overlap_keywords[], gap_keywords[], responsibility_coverage[], "
-                "rewrite_bullets[], priority_actions[]}。"
-                "评分=0.6*关键词重合+0.25*职责覆盖+0.15*加分项。"
-            )},
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}
+                "rewrite_bullets[], priority_actions[]}。评分=0.6*关键词重合+0.25*职责覆盖+0.15*加分项。")},
+            {"role":"user","content": json.dumps(payload, ensure_ascii=False)}
         ]
-        data = json.loads(ds_chat(messages, max_tokens=700, response_json=True))
+        data = load_json_strict(ds_chat(messages, max_tokens=700, response_json=True))
         CACHE[key] = data
         return jsonify(data)
     except Exception as e:
@@ -172,19 +169,17 @@ def interview_qa():
             "level": js.get("level", "Senior"),
             "num": int(js.get("num", 12))
         }
-        key = _sig({"route": "interview_qa", **payload})
-        if key in CACHE:
-            return jsonify(CACHE[key])
+        key = _sig({"route":"interview_qa", **payload})
+        if key in CACHE: return jsonify(CACHE[key])
 
         messages = [
-            {"role": "system", "content": (
+            {"role":"system","content":(
                 "你是面试官与教练。结合履历与目标岗位/行业，输出JSON："
                 "{questions:[{category, question, how_to_answer, sample_answer, pitfalls[]}]}。"
-                "要求：STAR结构；样例答案≤120字；避免套话。"
-            )},
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}
+                "要求：STAR结构；样例答案≤120字；避免套话。")},
+            {"role":"user","content": json.dumps(payload, ensure_ascii=False)}
         ]
-        data = json.loads(ds_chat(messages, max_tokens=800, response_json=True))
+        data = load_json_strict(ds_chat(messages, max_tokens=800, response_json=True))
         CACHE[key] = data
         return jsonify(data)
     except Exception as e:
@@ -199,19 +194,17 @@ def career_advice():
             "time_horizon": js.get("time_horizon", "3-5y"),
             "constraints": js.get("constraints", {})
         }
-        key = _sig({"route": "career_advice", **payload})
-        if key in CACHE:
-            return jsonify(CACHE[key])
+        key = _sig({"route":"career_advice", **payload})
+        if key in CACHE: return jsonify(CACHE[key])
 
         messages = [
-            {"role": "system", "content": (
+            {"role":"system","content":(
                 "你是职业规划顾问。输出3条可执行路径，每条包含："
                 "{title, why_now, gap_to_fill[], skills_to_learn[], network_to_build[], 90_day_plan[]}。"
-                "仅输出JSON。"
-            )},
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}
+                "仅输出JSON。")},
+            {"role":"user","content": json.dumps(payload, ensure_ascii=False)}
         ]
-        data = json.loads(ds_chat(messages, max_tokens=700, response_json=True))
+        data = load_json_strict(ds_chat(messages, max_tokens=700, response_json=True))
         CACHE[key] = data
         return jsonify(data)
     except Exception as e:
@@ -224,29 +217,21 @@ def career_advice():
 def full_report():
     try:
         js = request.get_json(force=True)
-
         resume_text = (js.get("resume_text") or "").strip()
         target_role  = (js.get("target_role") or "").strip()
         location     = (js.get("location") or "").strip()
         jd_text      = (js.get("jd_text") or "").strip()
         industry     = (js.get("industry") or "").strip()
-
-        if len(resume_text) > 25000:
-            resume_text = resume_text[:25000]
+        if len(resume_text) > 25000: resume_text = resume_text[:25000]
 
         cache_key = _sig({
-            "route": "full_report",
-            "resume_text": resume_text,
-            "target_role": target_role,
-            "location": location,
-            "jd_text": jd_text,
-            "industry": industry
+            "route":"full_report", "resume_text":resume_text, "target_role":target_role,
+            "location":location, "jd_text":jd_text, "industry":industry
         })
-        if cache_key in CACHE:
-            return jsonify(CACHE[cache_key])
+        if cache_key in CACHE: return jsonify(CACHE[cache_key])
 
         # 1) 解析
-        parsed = json.loads(ds_chat([
+        parsed = load_json_strict(ds_chat([
             {"role":"system","content":(
                 "将简历文本解析为结构化JSON：{basics, summary, education[], experiences[], "
                 "skills_core[], skills_optional[], keywords[]}；时间YYYY-MM；bullets≤30字并量化；仅输出JSON。")},
@@ -254,7 +239,7 @@ def full_report():
         ], max_tokens=600, response_json=True))
 
         # 2) 无JD优化
-        optimized = json.loads(ds_chat([
+        optimized = load_json_strict(ds_chat([
             {"role":"system","content":(
                 "基于 resume_struct 输出可直接替换的内容，仅输出JSON："
                 "{section_order[], summary_cn, summary_en, bullets_to_add[], bullets_to_tighten[], "
@@ -266,10 +251,10 @@ def full_report():
             }, ensure_ascii=False)}
         ], max_tokens=850, response_json=True))
 
-        # 3) ATS（如果提供了 JD）
+        # 3) ATS（可选）
         ats = None
         if jd_text:
-            ats = json.loads(ds_chat([
+            ats = load_json_strict(ds_chat([
                 {"role":"system","content":(
                     "比较 resume_struct 与 jd_text，输出JSON："
                     "{match_score, overlap_keywords[], gap_keywords[], responsibility_coverage[], "
@@ -281,7 +266,7 @@ def full_report():
             ], max_tokens=700, response_json=True))
 
         # 4) 面试问答
-        qa = json.loads(ds_chat([
+        qa = load_json_strict(ds_chat([
             {"role":"system","content":(
                 "结合履历与岗位/行业，输出JSON：{questions:[{category, question, how_to_answer, "
                 "sample_answer, pitfalls[]}]}；STAR结构；样例答案≤120字。")},
@@ -291,8 +276,8 @@ def full_report():
             }, ensure_ascii=False)}
         ], max_tokens=850, response_json=True))
 
-        # 5) 职业建议（3–5年路径）
-        advice = json.loads(ds_chat([
+        # 5) 职业建议
+        advice = load_json_strict(ds_chat([
             {"role":"system","content":(
                 "输出3条职业路径，每条含：{title, why_now, gap_to_fill[], "
                 "skills_to_learn[], network_to_build[], 90_day_plan[]}；仅输出JSON。")},
@@ -305,13 +290,11 @@ def full_report():
         result = {"parsed": parsed, "optimized": optimized, "ats": ats, "qa": qa, "advice": advice}
         CACHE[cache_key] = result
         return jsonify(result)
-
     except Exception as e:
-        # 把后端具体错误回传给前端，便于快速定位（鉴权/配额/超时等）
         return jsonify({"error": str(e)}), 500
 
 # ========================
-# 本地启动（Render 会用 gunicorn 启动）
+# 本地启动
 # ========================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", "10000")))
