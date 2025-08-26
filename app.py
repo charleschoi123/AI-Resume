@@ -13,7 +13,7 @@ MODEL_NAME       = os.getenv("MODEL_NAME", "deepseek-chat").strip()
 JOOBLE_API_KEY   = os.getenv("JOOBLE_API_KEY", "").strip()
 JOOBLE_ENDPOINT  = "https://jooble.org/api/{}/"  # POST JSON
 
-HTTP_TIMEOUT     = 60  # 单次 HTTP 超时（秒）
+HTTP_TIMEOUT     = 120  # 单次 HTTP 超时（秒）
 
 # ============ Flask ============
 app = Flask(__name__, template_folder="templates")
