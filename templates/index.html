@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <title>Alsos NeuroMatch · 求职助手 MVP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 24px; }
+    .card { border:1px solid #eee; border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 1px 6px rgba(0,0,0,.05); }
+    textarea, input, button, select { width:100%; padding:10px; margin-top:6px; border-radius:8px; border:1px solid #ddd; }
+    pre { background:#fafafa; padding:12px; border-radius:8px; white-space:pre-wrap; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .muted { color:#666; font-size:12px; }
+  </style>
+</head>
+<body>
+  <h2>Alsos NeuroMatch · 求职助手 MVP（DeepSeek 已对接）</h2>
+  <div class="muted">流程：粘贴简历文本 → 解析 →（无JD）优化 /（有JD）ATS评分 → 面试问答 → 职业建议</div>
+
+  <div class="card">
+    <h3>1) 粘贴你的简历文本（先复制PDF/Word里的文字再粘贴）</h3>
+    <textarea id="resume_text" rows="10" placeholder="在这里粘贴简历正文…"></textarea>
+    <button onclick="parseByText()">解析简历 → 结构化</button>
+    <pre id="parsed_out"></pre>
+  </div>
+
+  <div class="card">
+    <h3>2) 无 JD 的简历优化</h3>
+    <div class="row">
+      <div><input id="target_role" placeholder="目标岗位（可选）如：Clinical Development Director / 生物统计师" /></div>
+      <div><input id="target_industry" placeholder="目标行业（可选）如：Biotech/制药 / AI / Internet" /></div>
+    </div>
+    <select id="lang">
+      <option value="zh">中文</option>
+      <option value="en">English</option>
+      <option value="bilingual">中英双语</option>
+    </select>
+    <button onclick="optimize()">生成优化建议</button>
+    <pre id="opt_out"></pre>
+  </div>
+
+  <div class="card">
+    <h3>3) 有 JD 的 ATS 评分</h3>
+    <textarea id="jd_text" rows="8" placeholder="粘贴JD全文…"></textarea>
+    <button onclick="ats()">计算 ATS 分数与差距</button>
+    <pre id="ats_out"></pre>
+  </div>
+
+  <div class="card">
+    <h3>4) 行业面试问答与答法指导</h3>
+    <div class="row">
+      <div><input id="qa_role" placeholder="岗位 如：Biostatistician / 临床研发总监" /></div>
+      <div><input id="qa_industry" placeholder="行业 如：Biotech/制药 / AI / Internet" /></div>
+    </div>
+    <select id="qa_level"><option>Senior</option><option>Director</option><option>VP</option></select>
+    <input id="qa_num" type="number" value="12" />
+    <button onclick="qa()">生成问答卡片</button>
+    <pre id="qa_out"></pre>
+  </div>
+
+  <div class="card">
+    <h3>5) 个性化职业建议（含 90 天计划）</h3>
+    <div class="row">
+      <div><input id="adv_horizon" value="6-12m" /></div>
+      <div><input id="adv_constraints" placeholder='{"location":"Shanghai"}' /></div>
+    </div>
+    <button onclick="advice()">生成职业建议</button>
+    <pre id="adv_out"></pre>
+  </div>
+
+<script>
+let resumeStruct = null;
+
+async function parseByText() {
+  const text = document.getElementById('resume_text').value.trim();
+  if (!text) return alert('请先粘贴简历文本');
+  const r = await fetch('/parse_resume', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({resume_text: text})});
+  const j = await r.json(); resumeStruct = j; document.getElementById('parsed_out').textContent = JSON.stringify(j, null, 2);
+}
+
+async function optimize() {
+  if (!resumeStruct) return alert('请先完成第1步解析');
+  const payload = {
+    resume_struct: resumeStruct,
+    target_role: document.getElementById('target_role').value,
+    target_industry: document.getElementById('target_industry').value,
+    language: document.getElementById('lang').value
+  };
+  const r = await fetch('/resume_optimize', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const j = await r.json(); document.getElementById('opt_out').textContent = JSON.stringify(j, null, 2);
+}
+
+async function ats() {
+  if (!resumeStruct) return alert('请先完成第1步解析');
+  const payload = { resume_struct: resumeStruct, jd_text: document.getElementById('jd_text').value };
+  if (!payload.jd_text.trim()) return alert('请粘贴 JD');
+  const r = await fetch('/ats_score', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const j = await r.json(); document.getElementById('ats_out').textContent = JSON.stringify(j, null, 2);
+}
+
+async function qa() {
+  if (!resumeStruct) return alert('请先完成第1步解析');
+  const payload = {
+    resume_struct: resumeStruct,
+    target_role: document.getElementById('qa_role').value,
+    target_industry: document.getElementById('qa_industry').value,
+    level: document.getElementById('qa_level').value,
+    num: Number(document.getElementById('qa_num').value || 12)
+  };
+  const r = await fetch('/interview_qa', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const j = await r.json(); document.getElementById('qa_out').textContent = JSON.stringify(j, null, 2);
+}
+
+async function advice() {
+  if (!resumeStruct) return alert('请先完成第1步解析');
+  let constraints = {};
+  try { const raw = document.getElementById('adv_constraints').value.trim(); constraints = raw ? JSON.parse(raw) : {}; }
+  catch(e){ return alert('constraints 需为 JSON，例如 {"location":"Shanghai"}'); }
+  const payload = { resume_struct: resumeStruct, time_horizon: document.getElementById('adv_horizon').value || "6-12m", constraints };
+  const r = await fetch('/career_advice', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const j = await r.json(); document.getElementById('adv_out').textContent = JSON.stringify(j, null, 2);
+}
+</script>
+</body>
+</html>
