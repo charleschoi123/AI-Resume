@@ -1,8 +1,12 @@
-import os, json, hashlib, re
-from flask import Flask, request, jsonify, render_template
+import os, json, hashlib, re, io
+from flask import Flask, request, jsonify, render_template, send_file
 import requests
 from werkzeug.exceptions import HTTPException
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# ====== 可选：职位搜索 API（Jooble） ======
+JOOBLE_API_KEY = os.getenv("JOOBLE_API_KEY", "")  # 去 https://jooble.org/api/about 申请，免费
+JOOBLE_ENDPOINT = "https://jooble.org/api/{}"
 
 app = Flask(__name__)
 
@@ -83,7 +87,7 @@ def home():
 def health():
     return jsonify({"ok": True, "service": "Alsos NeuroMatch"})
 
-# ---------- 子能力（保留单接口） ----------
+# ---------- 子能力（与之前一致） ----------
 @app.post("/parse_resume")
 def parse_resume():
     try:
@@ -192,7 +196,7 @@ def career_advice():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ---------- 一键整合（解析→并行生成其余模块） ----------
+# ---------- 一键整合 ----------
 @app.post("/full_report")
 def full_report():
     try:
@@ -208,7 +212,6 @@ def full_report():
                           "location":location,"jd_text":jd_text,"industry":industry})
         if cache_key in CACHE: return jsonify(CACHE[cache_key])
 
-        # step 1: 先解析
         parsed = call_json([
             {"role":"system","content":(
                 "将简历文本解析为结构化JSON：{basics, summary, education[], experiences[], "
@@ -216,7 +219,6 @@ def full_report():
             {"role":"user","content": json.dumps({"resume_text": resume_text}, ensure_ascii=False)}
         ], max_tokens=600, hint="{basics, summary, education[], experiences[], skills_*[], keywords[]}")
 
-        # step 2: 并行生成其余模块
         def task_opt():
             return call_json([
                 {"role":"system","content":(
@@ -265,24 +267,193 @@ def full_report():
 
         results = {"parsed": parsed, "optimized": None, "ats": None, "qa": None, "advice": None}
         with ThreadPoolExecutor(max_workers=4) as ex:
-            futs = {
-                ex.submit(task_opt): "optimized",
-                ex.submit(task_qa): "qa",
-                ex.submit(task_adv): "advice",
-            }
-            if jd_text:
-                futs[ex.submit(task_ats)] = "ats"
-
+            futs = {ex.submit(task_opt): "optimized", ex.submit(task_qa): "qa", ex.submit(task_adv): "advice"}
+            if jd_text: futs[ex.submit(task_ats)] = "ats"
             for f in as_completed(futs):
                 key = futs[f]
-                try:
-                    results[key] = f.result()
-                except Exception as e:
-                    # 单个子任务失败也不影响其它
-                    results[key] = {"error": str(e)}
+                try: results[key] = f.result()
+                except Exception as e: results[key] = {"error": str(e)}
 
         CACHE[cache_key] = results
         return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ---------- 导出 DOCX ----------
+@app.post("/export_docx")
+def export_docx():
+    """
+    传入：{ report: <full_report_json>, filename: "报告.docx"(可选) }
+    返回：DOCX 文件
+    """
+    try:
+        js = request.get_json(force=True)
+        report = js.get("report", {})
+        filename = js.get("filename", "NeuroMatch-报告.docx")
+
+        from docx import Document
+        from docx.shared import Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        doc = Document()
+        style = doc.styles['Normal']
+        style.font.name = 'Microsoft YaHei'
+        style.font.size = Pt(10.5)
+
+        def h1(t):
+            p = doc.add_paragraph()
+            r = p.add_run(t)
+            r.bold = True; r.font.size = Pt(16)
+        def h2(t):
+            p = doc.add_paragraph()
+            r = p.add_run(t)
+            r.bold = True; r.font.size = Pt(13)
+
+        h1('Alsos NeuroMatch · 求职助手报告')
+        doc.add_paragraph('')
+
+        # 简历优化
+        opt = report.get('optimized', {})
+        h2('一、简历优化（可直接复制到简历）')
+        if opt.get('summary_cn'): doc.add_paragraph('【中文总结】'+opt['summary_cn'])
+        if opt.get('summary_en'): doc.add_paragraph('【English Summary】'+opt['summary_en'])
+        if opt.get('section_order'):
+            doc.add_paragraph('【推荐板块顺序】'+'、'.join(opt['section_order']))
+        if opt.get('skills_keywords_core'):
+            doc.add_paragraph('【核心关键词】'+'、'.join(opt['skills_keywords_core']))
+        if opt.get('bullets_to_add'):
+            doc.add_paragraph('【应补充要点】')
+            for b in opt['bullets_to_add']: doc.add_paragraph('· '+b, style=None)
+        if opt.get('bullets_to_tighten'):
+            doc.add_paragraph('【可精简要点】')
+            for b in opt['bullets_to_tighten']: doc.add_paragraph('· '+b, style=None)
+        if opt.get('title_suggestions'):
+            doc.add_paragraph('【推荐头衔】'+'、'.join(opt['title_suggestions']))
+
+        # ATS
+        ats = report.get('ats')
+        h2('二、ATS 匹配')
+        if ats:
+            doc.add_paragraph(f'【匹配度】{int(round(ats.get("match_score",0)))}')
+            if ats.get('overlap_keywords'):
+                doc.add_paragraph('【关键词覆盖】'+'、'.join(ats['overlap_keywords']))
+            if ats.get('gap_keywords'):
+                doc.add_paragraph('【关键词缺口】'+'、'.join(ats['gap_keywords']))
+            if ats.get('priority_actions'):
+                doc.add_paragraph('【优先行动】')
+                for a in ats['priority_actions']: doc.add_paragraph('· '+a)
+            if ats.get('rewrite_bullets'):
+                doc.add_paragraph('【推荐改写】')
+                for a in ats['rewrite_bullets']: doc.add_paragraph('· '+a)
+        else:
+            doc.add_paragraph('未提供 JD，暂不评分。')
+
+        # 面试问答
+        qa = (report.get('qa') or {}).get('questions', [])
+        h2('三、行业面试问答')
+        for i,q in enumerate(qa[:12],1):
+            doc.add_paragraph(f'Q{i}. {q.get("question","")}')
+            if q.get('how_to_answer'): doc.add_paragraph('答题思路：'+q['how_to_answer'])
+            if q.get('sample_answer'): doc.add_paragraph('示例答案：'+q['sample_answer'])
+            if q.get('pitfalls'):
+                doc.add_paragraph('易踩坑：')
+                for p in q['pitfalls']: doc.add_paragraph('· '+p)
+
+        # 职业建议
+        paths = report.get('advice',{}).get('career_paths') or report.get('advice',[])
+        h2('四、职业建议（3–5年）')
+        if paths:
+            for idx,p in enumerate(paths,1):
+                doc.add_paragraph(f'路径{idx}：{p.get("title","")}')
+                if p.get('why_now'): doc.add_paragraph('为什么现在：'+p['why_now'])
+                if p.get('90_day_plan'): 
+                    doc.add_paragraph('90天计划：'); 
+                    for x in p['90_day_plan']: doc.add_paragraph('· '+x)
+                if p.get('gap_to_fill'):
+                    doc.add_paragraph('需要补齐：'); 
+                    for x in p['gap_to_fill']: doc.add_paragraph('· '+x)
+                if p.get('skills_to_learn'):
+                    doc.add_paragraph('要学习的技能：'); 
+                    for x in p['skills_to_learn']: doc.add_paragraph('· '+x)
+                if p.get('network_to_build'):
+                    doc.add_paragraph('要建立的人脉：'); 
+                    for x in p['network_to_build']: doc.add_paragraph('· '+x)
+        else:
+            doc.add_paragraph('（暂无）')
+
+        bio = io.BytesIO()
+        doc.save(bio); bio.seek(0)
+        return send_file(bio, as_attachment=True, download_name=filename,
+                         mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ---------- 在线职位匹配 ----------
+@app.post("/job_search")
+def job_search():
+    """
+    入参：{ resume_struct, target_role, location, industry, limit }
+    返回：[{title, company, location, link, source, score}]
+    """
+    try:
+        js = request.get_json(force=True)
+        resume_struct = js.get("resume_struct", {})
+        target_role = (js.get("target_role") or "").strip()
+        location = (js.get("location") or "").strip()
+        industry = (js.get("industry") or "").strip()
+        limit = int(js.get("limit", 8))
+
+        # 1) 关键词：从解析/优化里抽取
+        keywords = set()
+        for k in (resume_struct.get("skills_core") or []) + (resume_struct.get("keywords") or []):
+            if isinstance(k,str) and len(k)<=30: keywords.add(k.lower())
+        if target_role: keywords |= set(target_role.lower().split())
+
+        results = []
+
+        # 2) Jooble（推荐：免费 Key；全球范围，含中国部分）
+        if JOOBLE_API_KEY:
+            payload = {
+                "keywords": target_role or " ".join(list(keywords)[:5]),
+                "location": location or "",
+                "searchMode": 1,
+                "page": 1,
+                "radius": 40
+            }
+            try:
+                r = requests.post(JOOBLE_ENDPOINT.format(JOOBLE_API_KEY), json=payload, timeout=30)
+                if r.status_code == 200:
+                    data = r.json().get("jobs", [])
+                    for j in data[:30]:
+                        results.append({
+                            "title": j.get("title"),
+                            "company": j.get("company"),
+                            "location": j.get("location"),
+                            "link": j.get("link"),
+                            "source": "Jooble",
+                            "desc": (j.get("snippet") or "")[:400]
+                        })
+            except Exception as e:
+                print("JOOBLE_ERR", e)
+
+        # 3) 没有 API key 的情况下，先返回引导
+        if not results and not JOOBLE_API_KEY:
+            return jsonify({"error": "未配置职位搜索 API key。请在 Render → Environment 添加 JOOBLE_API_KEY（免费），再试。"}), 400
+
+        # 4) 简单匹配度：关键词覆盖比 + 角色/地区加成
+        def score(job):
+            text = " ".join([job.get("title",""), job.get("desc","")]).lower()
+            hit = sum(1 for k in keywords if k and k in text)
+            base = 60 * (hit / max(len(keywords),1))
+            if target_role and target_role.lower() in text: base += 15
+            if location and location.lower() in (job.get("location","").lower()): base += 10
+            return round(min(100, base), 1)
+
+        for j in results:
+            j["score"] = score(j)
+
+        results = sorted(results, key=lambda x: x["score"], reverse=True)[:limit]
+        return jsonify({"jobs": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
