@@ -4,47 +4,38 @@
   <meta charset="utf-8"/>
   <title>Alsos NeuroMatch · 求职助手</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-
   <style>
-    :root{
-      --bg:#0b1020; --card:#121833; --muted:#8ea0c8; --text:#eaf1ff;
-      --acc1:#00e0ff; --acc2:#6f00ff; --ok:#23c55e; --warn:#f59e0b; --bad:#ef4444;
-    }
-    *{box-sizing:border-box}
-    body{margin:0; background:linear-gradient(180deg,#0b1020,#0d1330 30%,#0f1538); color:var(--text); font:14px/1.6 system-ui, -apple-system, "PingFang SC","Microsoft YaHei",Segoe UI, Roboto, Helvetica, Arial;}
-    .wrap{max-width:1100px; margin:24px auto; padding:0 16px;}
-    h1{font-size:28px; font-weight:800; margin:0 0 6px;
-       background:linear-gradient(90deg,var(--acc1),var(--acc2)); -webkit-background-clip:text; background-clip:text; color:transparent;}
-    .sub{color:var(--muted); margin-bottom:16px}
-
-    .card{background:linear-gradient(180deg,#0f1736,#0e1433);
-          border:1px solid rgba(255,255,255,.06);
-          border-radius:14px; padding:16px; margin:12px 0; box-shadow:0 10px 30px rgba(0,0,0,.25)}
-    .row{display:grid; gap:12px; grid-template-columns:1fr 1fr}
-    textarea,input,button,select{width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background:#0c1330; color:var(--text)}
-    textarea::placeholder, input::placeholder{color:#8091bf}
-    label{color:#b8c7f0; font-weight:600}
-    .muted{color:#9ab0e5; font-size:12px}
-
-    .progress{height:10px; background:#0a1030; border:1px solid rgba(255,255,255,.06); border-radius:999px; overflow:hidden; margin:12px 0}
-    .progress>div{height:100%; width:0%; background:linear-gradient(90deg,var(--acc1),var(--acc2)); transition:width .4s ease}
-
-    .btn{background:linear-gradient(90deg,#0f1b4c,#0c173f); border:1px solid rgba(255,255,255,.12);
-         color:#fff; font-weight:700; letter-spacing:.2em; text-align:center; padding:14px 20px; border-radius:12px}
+    :root{--bg:#0b1020; --card:#121833; --muted:#8ea0c8; --text:#eaf1ff; --acc1:#00e0ff; --acc2:#6f00ff; --ok:#23c55e; --warn:#f59e0b; --bad:#ef4444}
+    *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#0b1020,#0d1330 30%,#0f1538);color:var(--text);font:14px/1.6 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+    h1{font-size:28px;font-weight:800;margin:0 0 6px;background:linear-gradient(90deg,var(--acc1),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .sub{color:var(--muted);margin-bottom:16px}
+    .card{background:linear-gradient(180deg,#0f1736,#0e1433);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .row{display:grid;gap:12px;grid-template-columns:1fr 1fr}
+    textarea,input,button,select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:#0c1330;color:var(--text)}
+    textarea::placeholder,input::placeholder{color:#8091bf} label{color:#b8c7f0;font-weight:600}
+    .muted{color:#9ab0e5;font-size:12px}
+    .progress{height:10px;background:#0a1030;border:1px solid rgba(255,255,255,.06);border-radius:999px;overflow:hidden;margin:12px 0}
+    .progress>div{height:100%;width:0%;background:linear-gradient(90deg,var(--acc1),var(--acc2));transition:width .4s ease}
+    .btn{background:linear-gradient(90deg,#0f1b4c,#0c173f);border:1px solid rgba(255,255,255,.12);color:#fff;font-weight:700;letter-spacing:.2em;text-align:center;padding:12px 16px;border-radius:12px}
     .btn:disabled{opacity:.6}
-
-    .pill{display:inline-block; padding:3px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); margin:3px 6px 3px 0; color:#cfe0ff; background:#0c1330}
-    .score{font-weight:800; font-size:22px; padding:4px 10px; border-radius:10px; display:inline-block}
-    .score.ok{background:rgba(35,197,94,.12); border:1px solid rgba(35,197,94,.4); color:#81f4ab}
-    .score.mid{background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.45); color:#ffd688}
-    .score.bad{background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.45); color:#ffb4b4}
-
-    .sec h3{margin:0 0 8px; font-size:18px}
-    ul{margin:6px 0 10px 18px}
-    .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
-    .k{color:#9ab0e5}
-    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;}
-    .divider{height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent); margin:10px 0}
+    .btns{display:flex;gap:8px;flex-wrap:wrap}
+    .pill{display:inline-block;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.14);margin:3px 6px 3px 0;color:#cfe0ff;background:#0c1330}
+    .score{font-weight:800;font-size:22px;padding:4px 10px;border-radius:10px;display:inline-block}
+    .score.ok{background:rgba(35,197,94,.12);border:1px solid rgba(35,197,94,.4);color:#81f4ab}
+    .score.mid{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);color:#ffd688}
+    .score.bad{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.45);color:#ffb4b4}
+    .sec h3{margin:0 0 8px;font-size:18px} ul{margin:6px 0 10px 18px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .k{color:#9ab0e5}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+    .divider{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);margin:10px 0}
+    .job{padding:10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;margin:8px 0;background:#0c1330}
+    .job a{color:#aee1ff;text-decoration:none}
+    @media print{
+      body{background:#fff;color:#000}.card{box-shadow:none;border:1px solid #ddd;background:#fff}
+      .btn,.progress,.sub{display:none}.pill{border:1px solid #999;color:#000;background:#fff}
+      h1{color:#000;background:none}
+    }
   </style>
 </head>
 <body>
@@ -52,17 +43,14 @@
     <h1>Alsos NeuroMatch · 求职助手</h1>
     <div class="sub">粘贴简历 + 目标信息 → 一键生成：<span class="muted">简历优化 / ATS 重点动作（可选）/ 面试问答 / 职业路径与 90 天计划</span></div>
 
-    <!-- 输入 -->
     <div class="card">
       <div class="sec"><h3>输入</h3></div>
       <label>简历文本</label>
       <textarea id="resume_text" rows="8" placeholder="粘贴 PDF/Word 中的文字…"></textarea>
-
       <div class="row">
         <div><label>目标职位</label><input id="target_role" placeholder="如：资金总监 / Biostatistician"></div>
         <div><label>期望地点</label><input id="location" placeholder="如：上海 / 深圳 / Remote"></div>
       </div>
-
       <div class="row">
         <div><label>目标行业（可选）</label><input id="industry" placeholder="如：Biotech/制药 / AI / 制造业"></div>
         <div><label>目标职位 JD（可选，用于 ATS 评分）</label></div>
@@ -70,34 +58,40 @@
       <textarea id="jd_text" rows="5" placeholder="粘贴 JD 全文（可留空）…"></textarea>
 
       <div class="progress"><div id="bar"></div></div>
-      <button id="goBtn" class="btn" type="button" onclick="runFull();return false;">一键生成报告</button>
-      <div class="muted">提示：免费实例首次请求可能较慢（冷启动）；生成时长取决于内容长度。</div>
+      <div class="btns">
+        <button id="goBtn" class="btn" type="button" onclick="runFull();return false;">一键生成报告</button>
+        <button class="btn" type="button" onclick="exportPDF()">导出 PDF</button>
+        <button class="btn" type="button" onclick="exportDOCX()">导出 DOCX</button>
+        <button class="btn" type="button" onclick="searchJobs()">智能找岗位</button>
+      </div>
+      <div class="muted">提示：免费实例首次请求可能较慢（冷启动）。</div>
     </div>
 
-    <!-- 输出：美观卡片 -->
     <div id="pretty"></div>
+
+    <div id="jobs" class="card" style="display:none">
+      <div class="sec"><h3>智能匹配职位（实时搜索）</h3></div>
+      <div id="jobs_body" class="muted">点击“智能找岗位”开始搜索</div>
+    </div>
   </div>
 
 <script>
+let lastReport = null;
+
 function setBar(p){ const el=document.getElementById('bar'); if(el) el.style.width=p+'%'; }
 function pill(t){ return `<span class="pill">${escapeHtml(t)}</span>` }
 function escapeHtml(s){ return (s||'').toString().replace(/[&<>"]/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[m])) }
-
-function scoreBadge(n){
-  if(n>=80) return `<span class="score ok">${n}</span>`;
-  if(n>=60) return `<span class="score mid">${n}</span>`;
-  return `<span class="score bad">${n}</span>`;
-}
+function scoreBadge(n){ if(n>=80) return `<span class="score ok">${n}</span>`; if(n>=60) return `<span class="score mid">${n}</span>`; return `<span class="score bad">${n}</span>` }
 function list(arr){ if(!arr||!arr.length) return '<div class="muted">（暂无）</div>'; return '<ul>'+arr.map(x=>`<li>${escapeHtml(x)}</li>`).join('')+'</ul>'; }
 
 function renderReport(j){
+  lastReport = j;  // 供导出/职位匹配使用
   const pretty = document.getElementById('pretty');
   const opt = j.optimized || {};
   const ats = j.ats || null;
   const qa  = (j.qa && j.qa.questions) ? j.qa.questions : [];
-  const adv = j.advice || j.career_paths || j.advice?.career_paths || j.advice;
+  const paths = (j.advice && (j.advice.career_paths || j.advice)) || [];
 
-  // 1) 简历优化：摘要/板块顺序/要补充的要点/可精简要点/关键词/Title建议
   const secOrder = (opt.section_order||[]).map(pill).join(' ');
   const core = (opt.skills_keywords_core||[]).map(pill).join(' ');
   const opti = `
@@ -114,27 +108,19 @@ function renderReport(j){
           <div class="k">板块顺序（建议）</div>
           <div>${secOrder||'<span class="muted">（根据个人情况自动排列）</span>'}</div>
           <div class="divider"></div>
-          <div class="k">核心技能关键词（请体现在“技能/经历”里）</div>
+          <div class="k">核心技能关键词</div>
           <div>${core||'<span class="muted">（暂无）</span>'}</div>
         </div>
       </div>
       <div class="divider"></div>
       <div class="grid2">
-        <div>
-          <div class="k">应补充/增强的要点（Bullets to add）</div>
-          ${list(opt.bullets_to_add||[])}
-        </div>
-        <div>
-          <div class="k">可量化/合并的要点（Bullets to tighten）</div>
-          ${list(opt.bullets_to_tighten||[])}
-        </div>
+        <div><div class="k">应补充/增强的要点</div>${list(opt.bullets_to_add||[])}</div>
+        <div><div class="k">可量化/合并的要点</div>${list(opt.bullets_to_tighten||[])}</div>
       </div>
       <div class="divider"></div>
-      <div class="k">推荐职位头衔（Title Suggestions）</div>
-      ${list(opt.title_suggestions||[])}
+      <div class="k">推荐职位头衔</div>${list(opt.title_suggestions||[])}
     </div>`;
 
-  // 2) ATS：分数 + 关键词覆盖/缺口 + 优先行动 + 推荐改写
   let atsHtml = '';
   if (ats) {
     const score = Math.round( (ats.match_score||0) );
@@ -144,39 +130,21 @@ function renderReport(j){
         <div>匹配度：${scoreBadge(score)}（≥80 优秀 / 60–79 中等 / &lt;60 需改进）</div>
         <div class="divider"></div>
         <div class="grid2">
-          <div>
-            <div class="k">关键词覆盖（Overlap）</div>
-            ${list(ats.overlap_keywords||[])}
-          </div>
-          <div>
-            <div class="k">关键词缺口（Gap）</div>
-            ${list(ats.gap_keywords||[])}
-          </div>
+          <div><div class="k">关键词覆盖</div>${list(ats.overlap_keywords||[])}</div>
+          <div><div class="k">关键词缺口</div>${list(ats.gap_keywords||[])}</div>
         </div>
         <div class="divider"></div>
         <div class="grid2">
-          <div>
-            <div class="k">职责覆盖（Responsibility Coverage）</div>
-            ${list((ats.responsibility_coverage||[]).map(x => typeof x==='string'?x : `${x.item||''} — ${x.coverage||''}`))}
-          </div>
-          <div>
-            <div class="k">优先行动（Priority Actions）</div>
-            ${list(ats.priority_actions||[])}
-          </div>
+          <div><div class="k">职责覆盖</div>${list((ats.responsibility_coverage||[]).map(x => typeof x==='string'?x : `${x.item||''} — ${x.coverage||''}`))}</div>
+          <div><div class="k">优先行动</div>${list(ats.priority_actions||[])}</div>
         </div>
         <div class="divider"></div>
-        <div class="k">推荐改写（写入具体经历子弹）</div>
-        ${list(ats.rewrite_bullets||[])}
+        <div class="k">推荐改写</div>${list(ats.rewrite_bullets||[])}
       </div>`;
   } else {
-    atsHtml = `
-      <div class="card">
-        <div class="sec"><h3>报告 · ATS 匹配（若提供 JD）</h3></div>
-        <div class="muted">未提供 JD，已跳过评分。粘贴 JD 后可获得：匹配分、关键词缺口与优先改写建议。</div>
-      </div>`;
+    atsHtml = `<div class="card"><div class="sec"><h3>报告 · ATS 匹配（若提供 JD）</h3></div><div class="muted">未提供 JD。</div></div>`;
   }
 
-  // 3) 面试问答：问题 / 答法要点 / 示例答案 / 易踩坑
   const qaHtml = `
     <div class="card">
       <div class="sec"><h3>报告 · 行业面试问答（含答法）</h3></div>
@@ -192,14 +160,6 @@ function renderReport(j){
       `).join('') : '<div class="muted">（暂无问答）</div>'}
     </div>`;
 
-  // 4) 职业建议：3–5 年路径 + 90 天计划 / 技能 / 网络 / 缺口
-  function normalizePaths(advice){
-    // 兼容不同字段命名
-    if (!advice) return [];
-    if (Array.isArray(advice)) return advice;
-    return advice.career_paths || advice.paths || advice.plan || [];
-  }
-  const paths = normalizePaths(j.advice);
   const advHtml = `
     <div class="card">
       <div class="sec"><h3>报告 · 职业建议（3–5年）</h3></div>
@@ -208,24 +168,12 @@ function renderReport(j){
           <div class="k">路径 ${idx+1}：${escapeHtml(p.title||'目标角色')}</div>
           ${p.why_now? `<div style="margin-top:4px"><b>为什么现在：</b>${escapeHtml(p.why_now)}</div>`:''}
           <div class="grid2" style="margin-top:8px">
-            <div>
-              <div class="k">90 天计划</div>
-              ${list(p['90_day_plan']||p.plan_90||[])}
-            </div>
-            <div>
-              <div class="k">需要补齐的缺口</div>
-              ${list(p.gap_to_fill||[])}
-            </div>
+            <div><div class="k">90 天计划</div>${list(p['90_day_plan']||[])}</div>
+            <div><div class="k">需要补齐的缺口</div>${list(p.gap_to_fill||[])}</div>
           </div>
           <div class="grid2">
-            <div>
-              <div class="k">要学习的技能</div>
-              ${list(p.skills_to_learn||[])}
-            </div>
-            <div>
-              <div class="k">要建立的人脉</div>
-              ${list(p.network_to_build||[])}
-            </div>
+            <div><div class="k">要学习的技能</div>${list(p.skills_to_learn||[])}</div>
+            <div><div class="k">要建立的人脉</div>${list(p.network_to_build||[])}</div>
           </div>
         </div>
         <div class="divider"></div>
@@ -237,31 +185,70 @@ function renderReport(j){
 
 async function runFull(){
   const btn=document.getElementById('goBtn');
-  btn.disabled=true; btn.textContent='生成中…'; setBar(12);
-
-  const payload={
-    resume_text:(document.getElementById('resume_text').value||'').trim(),
-    target_role:(document.getElementById('target_role').value||'').trim(),
-    location:(document.getElementById('location').value||'').trim(),
-    jd_text:(document.getElementById('jd_text').value||'').trim(),
-    industry:(document.getElementById('industry').value||'').trim()
-  };
-  if(!payload.resume_text){ alert('请先粘贴简历文本'); btn.disabled=false; btn.textContent='一键生成报告'; setBar(0); return; }
-
+  btn.disabled=true; btn.textContent='生成中…'; setBar(15);
   try{
+    const payload={
+      resume_text:(document.getElementById('resume_text').value||'').trim(),
+      target_role:(document.getElementById('target_role').value||'').trim(),
+      location:(document.getElementById('location').value||'').trim(),
+      jd_text:(document.getElementById('jd_text').value||'').trim(),
+      industry:(document.getElementById('industry').value||'').trim()
+    };
+    if(!payload.resume_text){ alert('请先粘贴简历文本'); return;}
     const r = await fetch('/full_report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    setBar(55);
+    setBar(60);
     const raw = await r.text();
     let j; try{ j=JSON.parse(raw); }catch{ throw new Error('后端返回的不是JSON：'+raw.slice(0,200)); }
     if(!r.ok){ throw new Error(j && j.error ? j.error : '服务器错误'); }
-    setBar(90);
-    renderReport(j);
-    setBar(100);
+    renderReport(j); setBar(100);
+  }catch(e){ alert('生成失败：'+e.message); setBar(0); }
+  finally{ btn.disabled=false; btn.textContent='一键生成报告'; }
+}
+
+function exportPDF(){ window.print(); }
+
+async function exportDOCX(){
+  if(!lastReport){ return alert('请先生成报告'); }
+  try{
+    const r = await fetch('/export_docx',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report:lastReport, filename:'NeuroMatch-报告.docx'})});
+    if(!r.ok){ const t = await r.text(); return alert('导出失败：'+t); }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='NeuroMatch-报告.docx'; a.click();
+    URL.revokeObjectURL(url);
+  }catch(e){ alert('导出失败：'+e.message); }
+}
+
+async function searchJobs(){
+  if(!lastReport){ return alert('请先生成报告'); }
+  const jobsCard = document.getElementById('jobs');
+  const body = document.getElementById('jobs_body');
+  jobsCard.style.display='block';
+  body.innerHTML = '搜索中…';
+
+  const payload = {
+    resume_struct: lastReport.parsed || {},
+    target_role: (document.getElementById('target_role').value||'').trim(),
+    location: (document.getElementById('location').value||'').trim(),
+    industry: (document.getElementById('industry').value||'').trim(),
+    limit: 10
+  };
+  try{
+    const r = await fetch('/job_search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const raw = await r.text();
+    let j; try{ j=JSON.parse(raw); }catch{ throw new Error(raw.slice(0,200)); }
+    if(!r.ok){ throw new Error(j.error||'职位搜索失败'); }
+    const rows = (j.jobs||[]).map(job=>`
+      <div class="job">
+        <div><b>${escapeHtml(job.title||'')}</b> · ${escapeHtml(job.company||'')}</div>
+        <div class="muted">${escapeHtml(job.location||'')}</div>
+        <div style="margin:6px 0">${escapeHtml(job.desc||'')}</div>
+        <div>匹配度：${scoreBadge(job.score||0)}　来源：${escapeHtml(job.source||'')}</div>
+        ${job.link? `<div style="margin-top:6px"><a href="${job.link}" target="_blank">查看原职位</a></div>`:''}
+      </div>`).join('');
+    body.innerHTML = rows || '<div class="muted">未找到合适职位（请更换目标职位/地点后重试）。</div>';
   }catch(e){
-    alert('生成失败：'+e.message);
-    setBar(0);
-  }finally{
-    btn.disabled=false; btn.textContent='一键生成报告';
+    body.innerHTML = `<div class="muted">搜索失败：${escapeHtml(e.message)}<br>提示：在 Render 的 Environment 中添加 <b>JOOBLE_API_KEY</b>（免费），保存后重试。</div>`;
   }
 }
 </script>
