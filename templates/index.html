@@ -39,5 +39,68 @@
     <textarea id="jd_text" rows="6" placeholder="粘贴 JD 全文（可留空）…"></textarea>
 
     <div class="progress"><div id="bar"></div></div>
-    <button id="goBtn" class="primary" onclick="runFull()">一键生成报告</button>
-    <di
+    <!-- 关键：显式指定 type="button"，防止页面刷新 -->
+    <button id="goBtn" class="primary" type="button" onclick="runFull(); return false;">一键生成报告</button>
+    <div class="muted">提示：免费实例首次请求可能较慢，属正常冷启动。</div>
+  </div>
+
+  <div class="card"><h3>报告 · 简历优化</h3><pre id="opt_out"></pre></div>
+  <div class="card"><h3>报告 · ATS 匹配（若提供 JD）</h3><pre id="ats_out"></pre></div>
+  <div class="card"><h3>报告 · 行业面试问答</h3><pre id="qa_out"></pre></div>
+  <div class="card"><h3>报告 · 职业建议（3–5年）</h3><pre id="adv_out"></pre></div>
+
+<script>
+function setBar(p){ const el = document.getElementById('bar'); if (el) el.style.width = p + '%'; }
+
+async function runFull() {
+  console.log('[UI] click runFull');
+  const btn = document.getElementById('goBtn');
+  btn.disabled = true; btn.textContent = '生成中…'; setBar(10);
+  document.getElementById('opt_out').textContent = '';
+  document.getElementById('ats_out').textContent = '';
+  document.getElementById('qa_out').textContent  = '';
+  document.getElementById('adv_out').textContent = '';
+
+  const payload = {
+    resume_text: (document.getElementById('resume_text').value || '').trim(),
+    target_role: (document.getElementById('target_role').value || '').trim(),
+    location: (document.getElementById('location').value || '').trim(),
+    jd_text: (document.getElementById('jd_text').value || '').trim(),
+    industry: (document.getElementById('industry').value || '').trim()
+  };
+  if (!payload.resume_text) {
+    alert('请先粘贴简历文本'); btn.disabled=false; btn.textContent='一键生成报告'; setBar(0); return;
+  }
+
+  try {
+    console.log('[UI] POST /full_report', payload);
+    const r = await fetch('/full_report', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    setBar(50);
+
+    const raw = await r.text();
+    console.log('[UI] raw response length=', raw.length);
+    let j;
+    try { j = JSON.parse(raw); } catch { throw new Error(`后端返回的不是JSON：${raw.slice(0,300)}`); }
+
+    if (!r.ok) {
+      const msg = j && j.error ? j.error : JSON.stringify(j).slice(0,300);
+      throw new Error(msg);
+    }
+
+    document.getElementById('opt_out').textContent = JSON.stringify(j.optimized, null, 2);
+    document.getElementById('ats_out').textContent = j.ats ? JSON.stringify(j.ats, null, 2) : '未提供 JD，未评分。';
+    document.getElementById('qa_out').textContent  = JSON.stringify(j.qa, null, 2);
+    document.getElementById('adv_out').textContent = JSON.stringify(j.advice, null, 2);
+    setBar(100);
+  } catch(e){
+    alert('生成失败：' + e.message);
+    setBar(0);
+  } finally {
+    btn.disabled = false; btn.textContent = '一键生成报告';
+  }
+}
+</script>
+</body>
+</html>
