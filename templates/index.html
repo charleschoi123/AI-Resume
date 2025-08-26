@@ -254,7 +254,7 @@
       }
 
       const ctrl = new AbortController();
-      const timer = setTimeout(()=>ctrl.abort(), 120000);
+      const timer = setTimeout(()=>ctrl.abort(), 240000);
 
       try{
         const r = await fetch('/full_report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:ctrl.signal});
