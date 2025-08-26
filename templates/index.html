@@ -1,73 +1,44 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Alsos AI Resume · 求职助手</title>
-  <style>
-    :root{
-      --bg:#F3F2EF;          /* 类 LinkedIn 背景灰 */
-      --card:#FFFFFF;        /* 卡片白 */
-      --text:#111827;        /* 主文本 */
-      --muted:#6B7280;       /* 次文本 */
-      --border:#E5E7EB;      /* 边框灰 */
-      --brand:#0D3B2E;       /* 深绿主色 */
-      --brand-weak:#E7F0ED;  /* 主色浅底 */
-      --accent:#C9A227;      /* 点缀色（可选） */
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0; background:var(--bg); color:var(--text); font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif;
-    }
-    .topbar{
-      height:56px; background:var(--card); border-bottom:1px solid var(--border);
-      display:flex; align-items:center; justify-content:space-between; padding:0 16px; position:sticky; top:0; z-index:10;
-    }
-    .brand{ font-weight:800; letter-spacing:.3px; color:var(--brand); }
-    .hint{ color:var(--muted); font-size:12px }
-
-    .container{ max-width:1100px; margin:16px auto; padding:0 12px; display:grid; grid-template-columns: 360px 1fr; gap:16px; }
-    @media (max-width: 980px){ .container{ grid-template-columns: 1fr; } }
-
-    .card{
-      background:var(--card); border:1px solid var(--border); border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.03);
-    }
-    .card .section-title{
-      padding:14px 16px; font-weight:700; border-bottom:1px solid var(--border); color:var(--brand);
-    }
-    .card .body{ padding:14px 16px; }
-    .row{ display:flex; gap:10px; margin-bottom:10px; }
-    input[type=text], textarea{
-      width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:#FAFAFA; outline:none;
-    }
-    textarea{ min-height:140px; resize:vertical; }
-    .muted{ color:var(--muted); font-size:12px; }
-
-    .btn{
-      display:inline-flex; align-items:center; justify-content:center;
-      padding:10px 14px; border-radius:10px; border:1px solid transparent; cursor:pointer; user-select:none;
-      transition:all .15s ease;
-    }
-    .btn-primary{ background:var(--brand); color:#fff; }
-    .btn-primary:hover{ opacity:.9; }
-    .btn-ghost{ background:#EEF2F3; color:var(--brand); border-color:#DDE4E6; }
-    .btn-ghost:hover{ background:#E7ECEE; }
-
-    .feed .item{ margin-bottom:14px; overflow:hidden; }
-    .feed .item .title{ padding:12px 16px; font-weight:700; color:var(--brand); border-bottom:1px solid var(--border); }
-    .feed .item .content{ padding:14px 16px; line-height:1.6; }
-    .pill{ display:inline-block; padding:4px 8px; background:var(--brand-weak); border-radius:999px; margin-right:6px; margin-bottom:6px; }
-    .scorebar{
-      height:10px; background:#EEF2F3; border-radius:999px; overflow:hidden; margin-top:6px; border:1px solid var(--border);
-    }
-    .scorebar > span{ display:block; height:100%; background:var(--brand); }
-
-    .skeleton{ animation: pulse 1.2s infinite ease-in-out; background:#EAECEE; height:14px; border-radius:8px; margin:8px 0; }
-    @keyframes pulse{ 0%{opacity:.8} 50%{opacity:.4} 100%{opacity:.8} }
-
-    .banner{ background:#fffce7; border:1px solid #f3e7a6; color:#8b6a00; padding:8px 12px; border-radius:10px; margin-bottom:12px; font-size:13px; }
-    .error{ background:#fff1f1; border:1px solid #ffd0d0; color:#a20000; padding:10px 12px; border-radius:10px; margin-bottom:12px; }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Alsos AI Resume · 求职助手</title>
+<style>
+  :root{
+    --bg:#F3F2EF; --card:#fff; --text:#111827; --muted:#6B7280; --border:#E5E7EB;
+    --brand:#0D3B2E; --brand-weak:#E7F0ED; --warn:#fffce7; --warn-b:#f3e7a6;
+  }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif}
+  .topbar{height:56px;background:var(--card);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:10}
+  .brand{font-weight:800;color:var(--brand)}
+  .hint{color:var(--muted);font-size:12px}
+  .container{max-width:1100px;margin:16px auto;padding:0 12px;display:grid;grid-template-columns:360px 1fr;gap:16px}
+  @media (max-width:980px){.container{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.03)}
+  .section-title{padding:14px 16px;font-weight:700;border-bottom:1px solid var(--border);color:var(--brand)}
+  .body{padding:14px 16px}
+  .row{display:flex;gap:10px;margin-bottom:10px}
+  input[type=text],textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#FAFAFA;outline:none}
+  textarea{min-height:140px;resize:vertical}
+  .btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:10px;border:1px solid transparent;cursor:pointer;transition:all .15s ease}
+  .btn-primary{background:var(--brand);color:#fff}.btn-primary:hover{opacity:.9}
+  .btn-ghost{background:#EEF2F3;color:var(--brand);border-color:#DDE4E6}.btn-ghost:hover{background:#E7ECEE}
+  .feed .item{margin-bottom:14px;overflow:hidden}
+  .feed .title{padding:12px 16px;font-weight:700;color:var(--brand);border-bottom:1px solid var(--border)}
+  .feed .content{padding:14px 16px;line-height:1.65}
+  .pill{display:inline-block;padding:4px 8px;background:var(--brand-weak);border-radius:999px;margin:0 6px 6px 0}
+  .scorebar{height:12px;background:#EEF2F3;border-radius:999px;overflow:hidden;border:1px solid var(--border);position:relative}
+  .scorebar>span{display:block;height:100%;background:var(--brand)}
+  .scoreline{display:flex;align-items:center;gap:10px;margin:8px 0}
+  .muted{color:var(--muted);font-size:12px}
+  .banner{background:var(--warn);border:1px solid var(--warn-b);color:#8b6a00;padding:8px 12px;border-radius:10px;margin-bottom:12px;font-size:13px}
+  .error{background:#fff1f1;border:1px solid #ffd0d0;color:#a20000;padding:10px 12px;border-radius:10px;margin-bottom:12px}
+  .skeleton{animation:pulse 1.2s infinite ease-in-out;background:#EAECEE;height:14px;border-radius:8px;margin:8px 0}
+  @keyframes pulse{0%{opacity:.8}50%{opacity:.4}100%{opacity:.8}}
+</style>
 </head>
 <body>
   <div class="topbar">
@@ -76,253 +47,183 @@
   </div>
 
   <div class="container">
-    <!-- 左侧：输入 -->
+    <!-- 左：输入 -->
     <div class="card">
       <div class="section-title">输入区</div>
       <div class="body">
-        <div class="row">
-          <input type="file" id="resumeFile" accept=".txt,.docx" />
-        </div>
-        <div class="row">
-          <textarea id="resumeText" placeholder="① 直接粘贴简历文本（支持中文）&#10;② 或上传 .txt / .docx 自动填充"></textarea>
-        </div>
-        <div class="row">
-          <input id="targetTitle" type="text" placeholder="目标职位，如：产品经理 / 财务总监" />
-        </div>
-        <div class="row">
-          <input id="targetLocation" type="text" placeholder="期望地点，如：上海 / 深圳" />
-        </div>
-        <div class="row">
-          <input id="targetIndustry" type="text" placeholder="目标行业（可选），如：互联网 / 医药 / 制造" />
-        </div>
-        <div class="row">
-          <textarea id="jobDescription" placeholder="目标职位 JD（可选，用于 ATS 评分）"></textarea>
-        </div>
+        <div class="row"><input type="file" id="resumeFile" accept=".txt,.docx"/></div>
+        <div class="row"><textarea id="resumeText" placeholder="① 粘贴简历文本（中/英）&#10;② 或上传 .txt/.docx 自动填充"></textarea></div>
+        <div class="row"><input id="targetTitle" type="text" placeholder="目标职位，如：产品经理 / 设计经理 / 财务总监"/></div>
+        <div class="row"><input id="targetLocation" type="text" placeholder="期望地点，如：上海 / 深圳"/></div>
+        <div class="row"><input id="targetIndustry" type="text" placeholder="目标行业（可选），如：互联网 / 医药 / 制造"/></div>
+        <div class="row"><textarea id="jobDescription" placeholder="目标职位 JD（可选，用于 ATS 评分）"></textarea></div>
         <div class="row" style="gap:8px;">
           <button class="btn btn-primary" id="btnGenerate">一键生成报告</button>
           <button class="btn btn-ghost" id="btnClear">清空输入</button>
         </div>
-        <div class="muted">提示：首次生成可能较慢（冷启动 + LLM 计算），属正常。</div>
+        <div class="muted">提示：首次生成可能较慢（冷启动 + LLM 计算）。</div>
       </div>
     </div>
 
-    <!-- 右侧：结果 feed -->
+    <!-- 右：结果 -->
     <div class="feed">
       <div id="alertArea"></div>
-      <div id="feedArea">
-        <!-- 动态渲染 -->
-      </div>
+      <div id="feedArea"></div>
     </div>
   </div>
 
-  <script>
-    const $ = sel => document.querySelector(sel);
-    const feed = $("#feedArea");
-    const alertArea = $("#alertArea");
-    const cacheKey = "alsos_last_report_v1";
+<script>
+const $ = s => document.querySelector(s);
+const feed = $("#feedArea");
+const alertArea = $("#alertArea");
+const cacheKey = "alsos_last_report_v2";
 
-    function showBannerCache(){
-      const has = !!localStorage.getItem(cacheKey);
-      $("#cacheHint").style.display = has ? "block" : "none";
-    }
+function showBannerCache(){ $("#cacheHint").style.display = localStorage.getItem(cacheKey)? "block":"none"; }
+function escapeHtml(str){ return (str||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-    function skeleton(){
-      feed.innerHTML = `
-        <div class="card item"><div class="title">正在生成报告</div>
-          <div class="content">
-            <div class="skeleton" style="width:80%"></div>
-            <div class="skeleton" style="width:90%"></div>
-            <div class="skeleton" style="width:60%"></div>
-          </div>
-        </div>
-        <div class="card item"><div class="title">请稍候</div>
-          <div class="content">
-            <div class="skeleton" style="width:95%"></div>
-            <div class="skeleton" style="width:70%"></div>
-            <div class="skeleton" style="width:85%"></div>
-          </div>
-        </div>
-      `;
-    }
+function skeleton(){
+  feed.innerHTML = `
+    <div class="card item"><div class="feed"><div class="title">正在生成报告</div></div>
+      <div class="content"><div class="skeleton" style="width:80%"></div><div class="skeleton" style="width:90%"></div><div class="skeleton" style="width:60%"></div></div>
+    </div>
+    <div class="card item"><div class="title">请稍候</div>
+      <div class="content"><div class="skeleton" style="width:95%"></div><div class="skeleton" style="width:70%"></div><div class="skeleton" style="width:85%"></div></div>
+    </div>`;
+}
 
-    function pillList(arr){
-      return (arr||[]).map(x => `<span class="pill">${escapeHtml(x)}</span>`).join("");
-    }
+function pillList(arr){ return (arr||[]).map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join(""); }
+function card(title, html){ return `<div class="card item"><div class="title">${title}</div><div class="content">${html}</div></div>`; }
 
-    function scoreBar(v){ const clamped = Math.max(0, Math.min(100, Number(v||0))); return `
-      <div class="scorebar"><span style="width:${clamped}%"></span></div>
-      <div class="muted">${clamped}/100</div>`;}
+function scoreBar(v){
+  const n = Math.max(0, Math.min(100, Number(v||0)));
+  return `<div class="scorebar"><span style="width:${n}%"></span></div><div class="muted">${n}/100</div>`;
+}
 
-    function card(title, html){
-      return `<div class="card item">
-        <div class="title">${title}</div>
-        <div class="content">${html}</div>
-      </div>`;
-    }
+function salaryLine(label, val, min, max, currency){
+  const n = Number(val||0), hi = Number(max||0), lo = Number(min||0);
+  const pct = hi>lo ? Math.max(5, Math.min(100, Math.round((n-lo)/(hi-lo)*100))) : 5;
+  return `<div class="scoreline"><div style="width:70px" class="muted">${escapeHtml(label)}</div>
+    <div class="scorebar" style="flex:1"><span style="width:${pct}%"></span></div>
+    <div style="width:120px;text-align:right" class="muted">${currency||"CNY"} ${n}</div></div>`;
+}
 
-    function renderReport(data){
-      alertArea.innerHTML = "";
-      const d = data.data;
-      const meta = d.meta || {};
-      const ats  = d.ats  || {};
+function renderReport(resp){
+  alertArea.innerHTML = "";
+  const d = resp.data || {};
+  const meta = d.meta || {}; const ats = d.ats || {};
+  const sal = d.salary_insights || {};
 
-      const overview = `
-        <div class="banner">耗时：${(meta.elapsed_ms||0)} ms · 引擎：${meta.model_alias||"Alsos AI Resume"}</div>
-        <div class="muted">若提供 JD 将生成 ATS 匹配评分；未提供则不做 ATS。</div>`;
+  const overview = `
+    <div class="banner">耗时：${(meta.elapsed_ms||0)} ms · 引擎：${meta.model_alias||"Alsos AI Resume"}</div>
+    <div class="muted">若提供 JD 将生成 ATS 匹配评分；未提供则不做 ATS。</div>`;
 
-      const summary = `<p>${escapeHtml(d.summary||"")}</p>`;
-      const highlights = pillList(d.highlights);
-      const keywords = pillList(d.keywords);
+  const summary = `<p>${escapeHtml(d.summary||"")}</p>`;
+  const highlights = (d.highlights||[]).length ? pillList(d.highlights) : "<div class='muted'>建议在简历中补充量化成绩与项目指标</div>";
+  const keywords = (d.keywords||[]).length ? pillList(d.keywords) : "<div class='muted'>关键词不足，建议补充行业术语与工具名称</div>";
 
-      const career = `
-        <div><b>短期：</b><ul>${(d.career_suggestions?.short_term||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
-        <div><b>中期：</b><ul>${(d.career_suggestions?.mid_term||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
-        <div><b>长期：</b><ul>${(d.career_suggestions?.long_term||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>`;
+  const career = `
+    <div><b>短期：</b><ul>${(d.career_suggestions?.short_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div><b>中期：</b><ul>${(d.career_suggestions?.mid_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div><b>长期：</b><ul>${(d.career_suggestions?.long_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`;
 
-      const interview = `
-        <div><b>通用问题：</b><ul>${(d.interview_prep?.general||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
-        <div><b>岗位相关：</b><ul>${(d.interview_prep?.role_specific||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
-        <div class="muted"><b>STAR 提示：</b>${escapeHtml(d.interview_prep?.star_tips||"")}</div>`;
+  // 面试辅导：STAR 问答提示加入
+  const interview = `
+    <div><b>通用问题：</b><ul>${(d.interview_prep?.general||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div><b>岗位相关：</b><ul>${(d.interview_prep?.role_specific||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div class="muted"><b>STAR 提示：</b>${escapeHtml(d.interview_prep?.star_tips||"")}</div>`;
 
-      let atsHtml = "";
-      if (ats.enabled){
-        atsHtml = `
-          <div><b>总分：</b>${scoreBar(ats.total_score||0)}</div>
-          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px;">
-            <div><b>技能</b>${scoreBar(ats.sub_scores?.skills||0)}</div>
-            <div><b>经验</b>${scoreBar(ats.sub_scores?.experience||0)}</div>
-            <div><b>教育</b>${scoreBar(ats.sub_scores?.education||0)}</div>
-            <div><b>关键词</b>${scoreBar(ats.sub_scores?.keywords||0)}</div>
-          </div>
-          <div style="margin-top:8px;"><b>缺口关键词：</b>${pillList(ats.gap_keywords||[])}</div>
-          <div style="margin-top:8px;"><b>优化建议：</b><ul>${(ats.improvement_advice||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
-        `;
-      }else{
-        atsHtml = `<div class="muted">未提供 JD，未进行 ATS 评分。</div>`;
-      }
+  // ATS
+  let atsHtml = "";
+  if (ats.enabled){
+    const rs = ats.reasons || {};
+    atsHtml = `
+      <div><b>总分：</b>${scoreBar(ats.total_score||0)}</div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px;">
+        <div><b>技能</b>${scoreBar(ats.sub_scores?.skills||0)}<div class="muted">${(rs.skills||[]).join(" · ")}</div></div>
+        <div><b>经验</b>${scoreBar(ats.sub_scores?.experience||0)}<div class="muted">${(rs.experience||[]).join(" · ")}</div></div>
+        <div><b>教育</b>${scoreBar(ats.sub_scores?.education||0)}<div class="muted">${(rs.education||[]).join(" · ")}</div></div>
+        <div><b>关键词</b>${scoreBar(ats.sub_scores?.keywords||0)}<div class="muted">${(rs.keywords||[]).join(" · ")}</div></div>
+      </div>
+      <div style="margin-top:8px;"><b>缺口关键词：</b>${pillList(ats.gap_keywords||[])}</div>
+      <div style="margin-top:8px;"><b>优化建议：</b><ul>${(ats.improvement_advice||[]).map(li=>`<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
+    `;
+  } else {
+    atsHtml = `<div class="muted">未提供 JD，未进行 ATS 评分。</div>`;
+  }
 
-      const sal = d.salary_insights || {};
-      const salary = `
-        <div><b>${escapeHtml(sal.city||"-")} · ${escapeHtml(sal.title||"-")}</b></div>
-        <div style="margin:6px 0;">
-          <div class="muted">低位</div>${scoreBar(scaleSalary(sal.low, sal.high, sal.low))}
-          <div class="muted">中位</div>${scoreBar(scaleSalary(sal.mid, sal.high, sal.low))}
-          <div class="muted">高位</div>${scoreBar(100)}
-        </div>
-        <div class="muted">${escapeHtml(sal.notes||"模型估算，供参考")}</div>
-      `;
+  // 薪酬
+  const currency = sal.currency || "CNY";
+  const salary = `
+    <div><b>${escapeHtml(sal.city||"-")} · ${escapeHtml(sal.title||"-")}</b></div>
+    ${salaryLine("低位", sal.low, sal.low, sal.high, currency)}
+    ${salaryLine("中位", sal.mid, sal.low, sal.high, currency)}
+    ${salaryLine("高位", sal.high, sal.low, sal.high, currency)}
+    <div class="muted">影响因子：${(sal.factors||[]).join(" · ")}</div>
+    <div class="muted">${escapeHtml(sal.notes||"模型估算，供参考")}</div>`;
 
-      let html = "";
-      html += card("📌 概览", overview);
-      html += card("📝 简历摘要", summary);
-      html += card("🌟 职业亮点", highlights || "<div class='muted'>无</div>");
-      html += card("🔑 核心关键词", keywords   || "<div class='muted'>无</div>");
-      html += card("📈 求职方向", career);
-      html += card("📊 ATS 匹配", atsHtml);
-      html += card("💬 面试辅导", interview);
-      html += card("💰 薪酬估算", salary);
+  let html = "";
+  html += card("📌 概览", overview);
+  html += card("📝 简历摘要", summary);
+  html += card("🌟 职业亮点", highlights);
+  html += card("🔑 核心关键词", keywords);
+  html += card("📈 求职方向", career);
+  html += card("📊 ATS 匹配", atsHtml);
+  html += card("💬 面试辅导", interview);
+  html += card("💰 薪酬估算", salary);
 
-      feed.innerHTML = html;
+  feed.innerHTML = html;
 
-      // 缓存
-      localStorage.setItem(cacheKey, JSON.stringify(data));
-      showBannerCache();
-    }
+  // 缓存
+  localStorage.setItem(cacheKey, JSON.stringify(resp));
+  showBannerCache();
+}
 
-    function scaleSalary(v, max, min){
-      const high = Number(max||0), low = Number(min||0), val = Number(v||0);
-      if (high <= 0){ return 0; }
-      if (val <= low){ return 5; }
-      return Math.max(5, Math.min(100, Math.round((val - low) / (high - low + 1) * 100)));
-    }
+function showError(msg){ alertArea.innerHTML = `<div class="error">${escapeHtml(msg||"出错了")}</div>`; }
 
-    function showError(msg){
-      alertArea.innerHTML = `<div class="error">${escapeHtml(msg||"出错了")}</div>`;
-    }
+// 事件
+$("#resumeFile").addEventListener("change", async (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const fd = new FormData(); fd.append("file", f);
+  const res = await fetch("/extract-text",{method:"POST", body:fd});
+  const j = await res.json(); if(!j.ok){ showError(j.error||"文件解析失败"); return; }
+  $("#resumeText").value = j.text||"";
+});
+$("#btnClear").addEventListener("click", ()=>{
+  $("#resumeText").value=""; $("#targetTitle").value=""; $("#targetLocation").value="";
+  $("#targetIndustry").value=""; $("#jobDescription").value="";
+});
+$("#btnGenerate").addEventListener("click", async ()=>{
+  const resume_text=$("#resumeText").value.trim();
+  const job_description=$("#jobDescription").value.trim();
+  const target_title=$("#targetTitle").value.trim();
+  const target_location=$("#targetLocation").value.trim();
+  const target_industry=$("#targetIndustry").value.trim();
 
-    function escapeHtml(str){
-      return (str||"").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    }
+  if(!resume_text){ return showError("请粘贴简历文本或上传文件"); }
+  if(resume_text.length<500 && (resume_text.match(/[A-Za-z]+/g)||[]).length<300){
+    return showError("简历文本过短（≥500 中文字符或 ≥300 英文词）");
+  }
+  if(resume_text.length>18000) return showError("简历文本过长（≤ 18,000 字符）");
+  if(job_description.length>10000) return showError("JD 文本过长（≤ 10,000 字符）");
 
-    // 事件绑定
-    $("#resumeFile").addEventListener("change", async (e)=>{
-      const f = e.target.files[0];
-      if (!f) return;
-      const fd = new FormData();
-      fd.append("file", f);
-      const res = await fetch("/extract-text",{method:"POST", body:fd});
-      const j = await res.json();
-      if (!j.ok){ showError(j.error||"文件解析失败"); return; }
-      $("#resumeText").value = j.text||"";
+  skeleton();
+  try{
+    const resp = await fetch("/optimize",{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({resume_text,job_description,target_title,target_location,target_industry})
     });
+    const j = await resp.json();
+    if(!j.ok) return showError(j.error||"生成失败");
+    renderReport(j);
+  }catch(e){ showError("网络错误或服务器超时"); }
+});
+$("#btnClearCache").addEventListener("click",(e)=>{ e.preventDefault(); localStorage.removeItem(cacheKey); showBannerCache(); });
 
-    $("#btnClear").addEventListener("click", ()=>{
-      $("#resumeText").value = "";
-      $("#targetTitle").value = "";
-      $("#targetLocation").value = "";
-      $("#targetIndustry").value = "";
-      $("#jobDescription").value = "";
-    });
-
-    $("#btnGenerate").addEventListener("click", async ()=>{
-      const resume_text = $("#resumeText").value.trim();
-      const job_description = $("#jobDescription").value.trim();
-      const target_title = $("#targetTitle").value.trim();
-      const target_location = $("#targetLocation").value.trim();
-      const target_industry = $("#targetIndustry").value.trim();
-
-      if (!resume_text){
-        showError("请粘贴简历文本或上传文件");
-        return;
-      }
-      if (resume_text.length < 500 && (resume_text.match(/[A-Za-z]+/g)||[]).length < 300){
-        showError("简历文本过短（≥500 中文字符或 ≥300 英文词）");
-        return;
-      }
-      if (resume_text.length > 18000){
-        showError("简历文本过长（≤ 18,000 字符）");
-        return;
-      }
-      if (job_description.length > 10000){
-        showError("JD 文本过长（≤ 10,000 字符）");
-        return;
-      }
-
-      skeleton();
-      try{
-        const resp = await fetch("/optimize",{
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({
-            resume_text, job_description,
-            target_title, target_location, target_industry
-          })
-        });
-        const j = await resp.json();
-        if(!j.ok){ showError(j.error||"生成失败"); return; }
-        renderReport(j);
-      }catch(err){
-        showError("网络错误或服务器超时");
-      }
-    });
-
-    $("#btnClearCache").addEventListener("click",(e)=>{
-      e.preventDefault();
-      localStorage.removeItem(cacheKey);
-      showBannerCache();
-    });
-
-    // 首次加载：恢复缓存
-    (function(){
-      try{
-        const cache = localStorage.getItem(cacheKey);
-        if(cache){
-          const j = JSON.parse(cache);
-          renderReport(j);
-        }
-      }catch(e){}
-      showBannerCache();
-    })();
-  </script>
+// 启动时加载缓存
+(function(){
+  try{ const cache=localStorage.getItem(cacheKey); if(cache){ renderReport(JSON.parse(cache)); } }catch(e){}
+  showBannerCache();
+})();
+</script>
 </body>
 </html>
