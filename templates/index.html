@@ -181,4 +181,148 @@
 
       const interview = `
         <div><b>通用问题：</b><ul>${(d.interview_prep?.general||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
-        <d
+        <div><b>岗位相关：</b><ul>${(d.interview_prep?.role_specific||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
+        <div class="muted"><b>STAR 提示：</b>${escapeHtml(d.interview_prep?.star_tips||"")}</div>`;
+
+      let atsHtml = "";
+      if (ats.enabled){
+        atsHtml = `
+          <div><b>总分：</b>${scoreBar(ats.total_score||0)}</div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px;">
+            <div><b>技能</b>${scoreBar(ats.sub_scores?.skills||0)}</div>
+            <div><b>经验</b>${scoreBar(ats.sub_scores?.experience||0)}</div>
+            <div><b>教育</b>${scoreBar(ats.sub_scores?.education||0)}</div>
+            <div><b>关键词</b>${scoreBar(ats.sub_scores?.keywords||0)}</div>
+          </div>
+          <div style="margin-top:8px;"><b>缺口关键词：</b>${pillList(ats.gap_keywords||[])}</div>
+          <div style="margin-top:8px;"><b>优化建议：</b><ul>${(ats.improvement_advice||[]).map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul></div>
+        `;
+      }else{
+        atsHtml = `<div class="muted">未提供 JD，未进行 ATS 评分。</div>`;
+      }
+
+      const sal = d.salary_insights || {};
+      const salary = `
+        <div><b>${escapeHtml(sal.city||"-")} · ${escapeHtml(sal.title||"-")}</b></div>
+        <div style="margin:6px 0;">
+          <div class="muted">低位</div>${scoreBar(scaleSalary(sal.low, sal.high, sal.low))}
+          <div class="muted">中位</div>${scoreBar(scaleSalary(sal.mid, sal.high, sal.low))}
+          <div class="muted">高位</div>${scoreBar(100)}
+        </div>
+        <div class="muted">${escapeHtml(sal.notes||"模型估算，供参考")}</div>
+      `;
+
+      let html = "";
+      html += card("📌 概览", overview);
+      html += card("📝 简历摘要", summary);
+      html += card("🌟 职业亮点", highlights || "<div class='muted'>无</div>");
+      html += card("🔑 核心关键词", keywords   || "<div class='muted'>无</div>");
+      html += card("📈 求职方向", career);
+      html += card("📊 ATS 匹配", atsHtml);
+      html += card("💬 面试辅导", interview);
+      html += card("💰 薪酬估算", salary);
+
+      feed.innerHTML = html;
+
+      // 缓存
+      localStorage.setItem(cacheKey, JSON.stringify(data));
+      showBannerCache();
+    }
+
+    function scaleSalary(v, max, min){
+      const high = Number(max||0), low = Number(min||0), val = Number(v||0);
+      if (high <= 0){ return 0; }
+      if (val <= low){ return 5; }
+      return Math.max(5, Math.min(100, Math.round((val - low) / (high - low + 1) * 100)));
+    }
+
+    function showError(msg){
+      alertArea.innerHTML = `<div class="error">${escapeHtml(msg||"出错了")}</div>`;
+    }
+
+    function escapeHtml(str){
+      return (str||"").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    // 事件绑定
+    $("#resumeFile").addEventListener("change", async (e)=>{
+      const f = e.target.files[0];
+      if (!f) return;
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch("/extract-text",{method:"POST", body:fd});
+      const j = await res.json();
+      if (!j.ok){ showError(j.error||"文件解析失败"); return; }
+      $("#resumeText").value = j.text||"";
+    });
+
+    $("#btnClear").addEventListener("click", ()=>{
+      $("#resumeText").value = "";
+      $("#targetTitle").value = "";
+      $("#targetLocation").value = "";
+      $("#targetIndustry").value = "";
+      $("#jobDescription").value = "";
+    });
+
+    $("#btnGenerate").addEventListener("click", async ()=>{
+      const resume_text = $("#resumeText").value.trim();
+      const job_description = $("#jobDescription").value.trim();
+      const target_title = $("#targetTitle").value.trim();
+      const target_location = $("#targetLocation").value.trim();
+      const target_industry = $("#targetIndustry").value.trim();
+
+      if (!resume_text){
+        showError("请粘贴简历文本或上传文件");
+        return;
+      }
+      if (resume_text.length < 500 && (resume_text.match(/[A-Za-z]+/g)||[]).length < 300){
+        showError("简历文本过短（≥500 中文字符或 ≥300 英文词）");
+        return;
+      }
+      if (resume_text.length > 18000){
+        showError("简历文本过长（≤ 18,000 字符）");
+        return;
+      }
+      if (job_description.length > 10000){
+        showError("JD 文本过长（≤ 10,000 字符）");
+        return;
+      }
+
+      skeleton();
+      try{
+        const resp = await fetch("/optimize",{
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({
+            resume_text, job_description,
+            target_title, target_location, target_industry
+          })
+        });
+        const j = await resp.json();
+        if(!j.ok){ showError(j.error||"生成失败"); return; }
+        renderReport(j);
+      }catch(err){
+        showError("网络错误或服务器超时");
+      }
+    });
+
+    $("#btnClearCache").addEventListener("click",(e)=>{
+      e.preventDefault();
+      localStorage.removeItem(cacheKey);
+      showBannerCache();
+    });
+
+    // 首次加载：恢复缓存
+    (function(){
+      try{
+        const cache = localStorage.getItem(cacheKey);
+        if(cache){
+          const j = JSON.parse(cache);
+          renderReport(j);
+        }
+      }catch(e){}
+      showBannerCache();
+    })();
+  </script>
+</body>
+</html>
