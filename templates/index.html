@@ -9,10 +9,11 @@
     --bg:#F3F2EF; --card:#fff; --text:#111827; --muted:#6B7280; --border:#E5E7EB;
     --brand:#0D3B2E; --brand-weak:#E7F0ED; --warn:#fffce7; --warn-b:#f3e7a6;
   }
-  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif}
   .topbar{height:56px;background:var(--card);border-bottom:1px solid var(--border);
-    display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:10}
+          display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:10}
   .brand{font-weight:800;color:var(--brand)}
   .hint{color:var(--muted);font-size:12px}
   .container{max-width:1100px;margin:16px auto;padding:0 12px;display:grid;grid-template-columns:360px 1fr;gap:16px}
@@ -30,14 +31,15 @@
   .feed .title{padding:12px 16px;font-weight:700;color:var(--brand);border-bottom:1px solid var(--border)}
   .feed .content{padding:14px 16px;line-height:1.65}
   .pill{display:inline-block;padding:4px 8px;background:var(--brand-weak);border-radius:999px;margin:0 6px 6px 0}
-  .scorebar{height:12px;background:#EEF2F3;border-radius:999px;overflow:hidden;border:1px solid var(--border);position:relative}
-  .scorebar>span{display:block;height:100%;background:var(--brand)}
-  .scoreline{display:flex;align-items:center;gap:10px;margin:8px 0}
   .muted{color:var(--muted);font-size:12px}
   .banner{background:var(--warn);border:1px solid var(--warn-b);color:#8b6a00;padding:8px 12px;border-radius:10px;margin-bottom:12px;font-size:13px}
   .error{background:#fff1f1;border:1px solid #ffd0d0;color:#a20000;padding:10px 12px;border-radius:10px;margin-bottom:12px}
-  .skeleton{animation:pulse 1.2s infinite ease-in-out;background:#EAECEE;height:14px;border-radius:8px;margin:8px 0}
-  @keyframes pulse{0%{opacity:.8}50%{opacity:.4}100%{opacity:.8}}
+
+  /* 进度条 */
+  .progress-card{padding:18px}
+  .progress-wrap{background:#EEF2F3;border:1px solid var(--border);border-radius:10px;overflow:hidden;height:14px}
+  .progress-bar{height:100%;background:var(--brand);width:0%}
+  .progress-text{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
 </style>
 </head>
 <body>
@@ -76,61 +78,96 @@
 const $ = s => document.querySelector(s);
 const feed = $("#feedArea");
 const alertArea = $("#alertArea");
-const cacheKey = "alsos_last_report_v2";
+const cacheKey = "alsos_last_report_v3";
 
 function showBannerCache(){ $("#cacheHint").style.display = localStorage.getItem(cacheKey)? "block":"none"; }
 function escapeHtml(str){ return (str||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function card(title, html){ return `<div class="card item"><div class="title">${title}</div><div class="content">${html}</div></div>`; }
+function pillList(arr){ return (arr||[]).map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join(""); }
 
-function skeleton(){
+function showProgress(){
   feed.innerHTML = `
-    <div class="card item"><div class="feed"><div class="title">正在生成报告</div></div>
-      <div class="content"><div class="skeleton" style="width:80%"></div><div class="skeleton" style="width:90%"></div><div class="skeleton" style="width:60%"></div></div>
-    </div>
-    <div class="card item"><div class="title">请稍候</div>
-      <div class="content"><div class="skeleton" style="width:95%"></div><div class="skeleton" style="width:70%"></div><div class="skeleton" style="width:85%"></div></div>
+    <div class="card item progress-card">
+      <div class="title">正在分析简历</div>
+      <div class="content">
+        <div class="progress-wrap"><div class="progress-bar" id="pgbar"></div></div>
+        <div class="progress-text">莫着急、莫着急，你的简历很精彩，容我认真拜读～</div>
+      </div>
     </div>`;
+  // 模拟进度
+  let p = 0;
+  const el = $("#pgbar");
+  const timer = setInterval(()=>{
+    p += Math.random()*8 + 4; // 4-12%
+    if(p >= 90) { p = 90; clearInterval(timer); } // 等接口返回后再拉到 100
+    el.style.width = p + "%";
+  }, 400);
+  return ()=>{ clearInterval(timer); el.style.width = "100%"; };
 }
 
-function pillList(arr){ return (arr||[]).map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join(""); }
-function card(title, html){ return `<div class="card item"><div class="title">${title}</div><div class="content">${html}</div></div>`; }
-
-function scoreBar(v){
-  const n = Math.max(0, Math.min(100, Number(v||0)));
-  return `<div class="scorebar"><span style="width:${n}%"></span></div><div class="muted">${n}/100</div>`;
+function scoreBar(n){
+  n = Math.max(0, Math.min(100, Number(n||0)));
+  return `<div style="display:flex;gap:10px;align-items:center">
+    <div style="flex:1;height:12px;background:#EEF2F3;border:1px solid #E5E7EB;border-radius:999px;overflow:hidden">
+      <div style="height:100%;background:#0D3B2E;width:${n}%"></div>
+    </div><div class="muted" style="width:48px;text-align:right">${n}/100</div></div>`;
 }
 
 function salaryLine(label, val, min, max, currency){
   const n = Number(val||0), hi = Number(max||0), lo = Number(min||0);
   const pct = hi>lo ? Math.max(5, Math.min(100, Math.round((n-lo)/(hi-lo)*100))) : 5;
-  return `<div class="scoreline"><div style="width:70px" class="muted">${escapeHtml(label)}</div>
-    <div class="scorebar" style="flex:1"><span style="width:${pct}%"></span></div>
-    <div style="width:120px;text-align:right" class="muted">${currency||"CNY"} ${n}</div></div>`;
+  return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0">
+    <div style="width:36px" class="muted">${escapeHtml(label)}</div>
+    <div style="flex:1;height:12px;background:#EEF2F3;border:1px solid #E5E7EB;border-radius:999px;overflow:hidden">
+      <div style="height:100%;background:#0D3B2E;width:${pct}%"></div>
+    </div>
+    <div style="width:120px;text-align:right" class="muted">${currency||"CNY"} ${n}</div>
+  </div>`;
 }
 
 function renderReport(resp){
   alertArea.innerHTML = "";
   const d = resp.data || {};
-  const meta = d.meta || {}; const ats = d.ats || {};
+  const meta = d.meta || {};
+  const ats = d.ats || {};
   const sal = d.salary_insights || {};
+  let html = "";
 
+  // 概览
   const overview = `
     <div class="banner">耗时：${(meta.elapsed_ms||0)} ms · 引擎：${meta.model_alias||"Alsos AI Resume"}</div>
     <div class="muted">若提供 JD 将生成 ATS 匹配评分；未提供则不做 ATS。</div>`;
+  html += card("📌 概览", overview);
 
-  const summary = `<p>${escapeHtml(d.summary||"")}</p>`;
-  const highlights = (d.highlights||[]).length ? pillList(d.highlights) : "<div class='muted'>建议在简历中补充量化成绩与项目指标</div>";
-  const keywords = (d.keywords||[]).length ? pillList(d.keywords) : "<div class='muted'>关键词不足，建议补充行业术语与工具名称</div>";
+  // 简历 Summary 概要
+  html += card("📝 简历 Summary 概要", `<p>${escapeHtml(d.summary||"")}</p>`);
 
+  // 职业亮点（句子）
+  const hl = d.highlights||[];
+  html += card("🌟 职业亮点", hl.length ? `<ul>${hl.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>` : `<div class="muted">建议补充含数字的成果亮点</div>`);
+
+  // 新：简历优化建议（问题点→改进方案→原因）
+  const imps = d.resume_improvements||[];
+  const impHtml = imps.length ? imps.map((it,i)=>`
+    <div style="margin-bottom:10px">
+      <div><b>${i+1}. 问题点：</b>${escapeHtml(it.issue||"")}</div>
+      <div><b>改进方案：</b>${escapeHtml(it.fix||"")}</div>
+      <div class="muted"><b>原因：</b>${escapeHtml(it.why||"")}</div>
+    </div>
+  `).join("") : `<div class="muted">未生成有效的优化建议</div>`;
+  html += card("🔧 简历优化建议", impHtml);
+
+  // 关键词
+  const kw = d.keywords||[];
+  html += card("🔑 核心关键词", kw.length ? pillList(kw) : `<div class="muted">关键词不足，建议补充行业术语与工具名称</div>`);
+
+  // 求职方向
+  const cs = d.career_suggestions||{};
   const career = `
-    <div><b>短期：</b><ul>${(d.career_suggestions?.short_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-    <div><b>中期：</b><ul>${(d.career_suggestions?.mid_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-    <div><b>长期：</b><ul>${(d.career_suggestions?.long_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`;
-
-  // 面试辅导：STAR 问答提示加入
-  const interview = `
-    <div><b>通用问题：</b><ul>${(d.interview_prep?.general||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-    <div><b>岗位相关：</b><ul>${(d.interview_prep?.role_specific||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-    <div class="muted"><b>STAR 提示：</b>${escapeHtml(d.interview_prep?.star_tips||"")}</div>`;
+    <div><b>短期：</b><ul>${(cs.short_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div><b>中期：</b><ul>${(cs.mid_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div><b>长期：</b><ul>${(cs.long_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`;
+  html += card("📈 求职方向（策略化）", career);
 
   // ATS
   let atsHtml = "";
@@ -138,7 +175,7 @@ function renderReport(resp){
     const rs = ats.reasons || {};
     atsHtml = `
       <div><b>总分：</b>${scoreBar(ats.total_score||0)}</div>
-      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px;">
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px;">
         <div><b>技能</b>${scoreBar(ats.sub_scores?.skills||0)}<div class="muted">${(rs.skills||[]).join(" · ")}</div></div>
         <div><b>经验</b>${scoreBar(ats.sub_scores?.experience||0)}<div class="muted">${(rs.experience||[]).join(" · ")}</div></div>
         <div><b>教育</b>${scoreBar(ats.sub_scores?.education||0)}<div class="muted">${(rs.education||[]).join(" · ")}</div></div>
@@ -150,6 +187,30 @@ function renderReport(resp){
   } else {
     atsHtml = `<div class="muted">未提供 JD，未进行 ATS 评分。</div>`;
   }
+  html += card("📊 ATS 匹配", atsHtml);
+
+  // 面试手册
+  const ih = d.interview_handbook || {};
+  const handbook = `
+    <div><b>回答逻辑：</b><ul>${(ih.answer_logic||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div><b>岗位层级差异：</b>
+      <div style="margin-top:6px"><i>Junior</i><ul>${(ih.level_differences?.junior||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+      <div style="margin-top:6px"><i>Senior</i><ul>${(ih.level_differences?.senior||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    </div>
+    <div><b>不同面试官关注点：</b>
+      <div style="margin-top:6px"><i>HR</i><ul>${(ih.interviewer_focus?.HR||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+      <div style="margin-top:6px"><i>部门负责人</i><ul>${(ih.interviewer_focus?.hiring_manager||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+      <div style="margin-top:6px"><i>老板/高层</i><ul>${(ih.interviewer_focus?.executive||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    </div>
+    <div><b>STAR 项目答题提示（3 套）：</b>
+      <ol>${(ih.star_sets||[]).map(s=>`
+        <li>
+          <div><b>${escapeHtml(s.project_title||"项目")}</b> · ${escapeHtml(s.question||"")}</div>
+          <ul>${(s.how_to_answer||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>
+        </li>`).join("")}
+      </ol>
+    </div>`;
+  html += card("📖 面试手册", handbook);
 
   // 薪酬
   const currency = sal.currency || "CNY";
@@ -160,15 +221,6 @@ function renderReport(resp){
     ${salaryLine("高位", sal.high, sal.low, sal.high, currency)}
     <div class="muted">影响因子：${(sal.factors||[]).join(" · ")}</div>
     <div class="muted">${escapeHtml(sal.notes||"模型估算，供参考")}</div>`;
-
-  let html = "";
-  html += card("📌 概览", overview);
-  html += card("📝 简历摘要", summary);
-  html += card("🌟 职业亮点", highlights);
-  html += card("🔑 核心关键词", keywords);
-  html += card("📈 求职方向", career);
-  html += card("📊 ATS 匹配", atsHtml);
-  html += card("💬 面试辅导", interview);
   html += card("💰 薪酬估算", salary);
 
   feed.innerHTML = html;
@@ -180,7 +232,7 @@ function renderReport(resp){
 
 function showError(msg){ alertArea.innerHTML = `<div class="error">${escapeHtml(msg||"出错了")}</div>`; }
 
-// 事件
+// ========== 事件 ==========
 $("#resumeFile").addEventListener("change", async (e)=>{
   const f = e.target.files[0]; if(!f) return;
   const fd = new FormData(); fd.append("file", f);
@@ -188,10 +240,12 @@ $("#resumeFile").addEventListener("change", async (e)=>{
   const j = await res.json(); if(!j.ok){ showError(j.error||"文件解析失败"); return; }
   $("#resumeText").value = j.text||"";
 });
+
 $("#btnClear").addEventListener("click", ()=>{
   $("#resumeText").value=""; $("#targetTitle").value=""; $("#targetLocation").value="";
   $("#targetIndustry").value=""; $("#jobDescription").value="";
 });
+
 $("#btnGenerate").addEventListener("click", async ()=>{
   const resume_text=$("#resumeText").value.trim();
   const job_description=$("#jobDescription").value.trim();
@@ -206,20 +260,25 @@ $("#btnGenerate").addEventListener("click", async ()=>{
   if(resume_text.length>18000) return showError("简历文本过长（≤ 18,000 字符）");
   if(job_description.length>10000) return showError("JD 文本过长（≤ 10,000 字符）");
 
-  skeleton();
+  const finishProgress = showProgress();
   try{
     const resp = await fetch("/optimize",{
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({resume_text,job_description,target_title,target_location,target_industry})
     });
     const j = await resp.json();
+    finishProgress();
     if(!j.ok) return showError(j.error||"生成失败");
     renderReport(j);
-  }catch(e){ showError("网络错误或服务器超时"); }
+  }catch(e){
+    finishProgress();
+    showError("网络错误或服务器超时");
+  }
 });
+
 $("#btnClearCache").addEventListener("click",(e)=>{ e.preventDefault(); localStorage.removeItem(cacheKey); showBannerCache(); });
 
-// 启动时加载缓存
+// 启动：加载缓存
 (function(){
   try{ const cache=localStorage.getItem(cacheKey); if(cache){ renderReport(JSON.parse(cache)); } }catch(e){}
   showBannerCache();
