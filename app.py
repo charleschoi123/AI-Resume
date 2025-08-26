@@ -27,11 +27,20 @@ app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024  # 允许较大文本
 # 统一响应头（避免代理缓存/缓冲导致“Failed to fetch”）
 @app.after_request
 def add_headers(resp):
-    resp.headers["Content-Type"]      = "application/json; charset=utf-8"
-    resp.headers["Cache-Control"]     = "no-store"
-    resp.headers["Connection"]        = "keep-alive"
-    resp.headers["X-Accel-Buffering"] = "no"
+    # 通用头
+    resp.headers['Cache-Control'] = 'no-store'
+    resp.headers['Connection'] = 'keep-alive'
+    resp.headers['X-Accel-Buffering'] = 'no'
+
+    # 如果是 HTML，就保留 text/html，别改成 json
+    content_type = (resp.headers.get('Content-Type') or '').lower()
+    if 'text/html' in content_type:
+        return resp
+
+    # 其他（JSON 接口）统一声明为 JSON
+    resp.headers['Content-Type'] = 'application/json; charset=utf-8'
     return resp
+
 
 
 # ==============================
