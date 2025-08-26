@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Alsos NeuroMatch · 求职助手</title>
   <style>
+    /* ===== 视觉 - 深色 UI（屏幕） ===== */
     :root{--bg:#0b0f15;--card:#121826;--ink:#e8eefc;--muted:#96a2bf;--accent:#7c9cff;}
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",PingFang SC,Helvetica,Arial;}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",PingFang SC,Helvetica,Arial,"Microsoft YaHei";}
     .wrap{max-width:1100px;margin:28px auto;padding:0 16px;}
     h1{font-size:26px;margin:0 0 18px;letter-spacing:.2px}
     .row{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
-    .card{background:var(--card);border:1px solid #1d2435;border-radius:14px;padding:14px 14px}
+    .card{background:var(--card);border:1px solid #1d2435;border-radius:14px;padding:14px}
     .card h3{margin:0 0 8px;font-size:16px;font-weight:600;color:#dfe7ff}
-    textarea, input, select{width:100%;box-sizing:border-box;background:#0d1320;border:1px solid #293148;border-radius:10px;color:var(--ink);padding:10px 12px;outline:none}
+    textarea,input,select{width:100%;box-sizing:border-box;background:#0d1320;border:1px solid #293148;border-radius:10px;color:var(--ink);padding:10px 12px;outline:none}
     textarea{min-height:220px;resize:vertical;line-height:1.55}
     .muted{color:var(--muted);font-size:12px}
     .bar{height:8px;background:#0e1527;border-radius:999px;overflow:hidden;border:1px solid #28324a}
@@ -24,19 +25,40 @@
     .ghost{background:#0f1423}
     .section{margin-top:18px}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .block{white-space:pre-wrap;background:#0c1322;border:1px solid #253050;border-radius:12px;padding:12px;color:#cfe0ff;font-family:ui-monospace,Consolas,Monaco,monospace;overflow:auto}
+    .block{white-space:normal;background:#0c1322;border:1px solid #253050;border-radius:12px;padding:12px;color:#cfe0ff}
     .tag{display:inline-block;font-size:12px;padding:3px 8px;border-radius:999px;background:#101832;border:1px solid #283659;margin:0 6px 6px 0}
     .job{background:#0e1527;border:1px solid #283659;border-radius:14px;padding:12px;margin-bottom:10px}
     .job h4{margin:0 0 4px}
     .job a{color:#9ec1ff;text-decoration:none}
     .footerNote{margin-top:8px;color:#8fa0c6;font-size:12px}
+
+    /* ==== 阅读版样式（屏幕） ==== */
+    .ksec h4{margin:0 0 8px;font-size:15px;color:#eaefff}
+    .krow{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+    .kbadge{background:#101a33;border:1px solid #2a3b65;color:#cfe0ff;font-size:12px;border-radius:999px;padding:4px 10px;display:inline-block}
+    .klist{margin:6px 0 0 0;padding-left:18px}
+    .klist li{margin:4px 0}
+    .ksmall{color:#8fa0c6;font-size:12px;margin-top:6px}
+    .kcard{background:#0c1322;border:1px solid #27324f;border-radius:12px;padding:10px 12px;margin-top:6px}
+    .kmuted{color:#94a2bf}
+    .ktoggle{font-size:12px;color:#9ec1ff;cursor:pointer;margin-left:8px}
+    details.kjson{margin-top:8px}
+
+    /* ===== 打印 / PDF（Jobright 极简白底） ===== */
     @media print{
-      body{background:#fff;color:#000}
-      .wrap{max-width:none}
-      .no-print{display:none}
-      .card{border:none}
-      .block{border:1px solid #ccc;background:#fff;color:#000}
+      :root{--ink:#000}
+      body{background:#fff;color:#000;font-size:14px}
+      .no-print{display:none!important}
+      .wrap{max-width:none;margin:0;padding:0 10mm}
+      h1{font-size:22px;margin:10px 0 8px;color:#111}
+      .card{background:#fff;border:none;border-radius:0;padding:0;margin:0}
+      .row{grid-template-columns:1fr 1fr;gap:14px}
+      textarea,input,select{background:#fff;border:1px solid #ddd;color:#000}
+      .block,.kcard{background:#fff;border:1px solid #e6e6e6;border-radius:6px;color:#111}
+      .kbadge{background:#f5f7fb;border:1px solid #dfe6f6;color:#333}
+      .job{background:#fff;border:1px solid #e6e6e6}
       a{color:#000;text-decoration:none}
+      .bar{display:none}
     }
   </style>
 </head>
@@ -111,42 +133,103 @@
   </div>
 
   <script>
-    // 进度条
+    /* ===== 进度条 ===== */
     function setBar(v){ document.getElementById('pbar').style.width = Math.max(0,Math.min(100,v)) + '%'; }
 
-    // 渲染报告
-    let lastReport = null;
-    function renderReport(j){
-      lastReport = j || {};
-      // 简历优化
-      const opt = j.resume_optimization || {};
-      const optText = JSON.stringify(opt, null, 2);
-      document.getElementById('optBlock').textContent = optText || '无';
+    /* ===== 安全工具 ===== */
+    const esc = s => (s||"").toString().replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
+    const li = s => `<li>${esc(s)}</li>`;
+    const list = arr => `<ul class="klist">${(arr||[]).map(li).join("")||"<li class='kmuted'>（暂无）</li>"}</ul>`;
+    const badges = arr => `<div class="krow">${(arr||[]).map(x=>`<span class="kbadge">${esc(x)}</span>`).join("")||"<span class='kmuted'>（暂无）</span>"}</div>`;
+    const jsonBox = (obj, label="查看原始 JSON") => `
+      <details class="kjson"><summary class="ktoggle">${label}</summary>
+        <div class="kcard"><pre style="white-space:pre-wrap;margin:0">${esc(JSON.stringify(obj||{}, null, 2))}</pre></div>
+      </details>`;
 
-      // ATS
-      const ats = j.ats || {};
-      const atsText = JSON.stringify(ats, null, 2);
-      document.getElementById('atsBlock').textContent = atsText || '无';
-
-      // Q&A
-      const qa = j.interview || {};
-      const qaText = JSON.stringify(qa, null, 2);
-      document.getElementById('qaBlock').textContent = qaText || '无';
-
-      // Career
-      const car = j.career || {};
-      const carText = JSON.stringify(car, null, 2);
-      document.getElementById('careerBlock').textContent = carText || '无';
+    /* ===== 各模块渲染 ===== */
+    function renderOptimization(opt){
+      const html = `
+        <div class="ksec">
+          <h4>建议添加的要点</h4>${list(opt.bullets_to_add)}
+          <h4>建议精简/收紧</h4>${list(opt.bullets_to_tighten)}
+          <div class="ksec">
+            <h4>推荐版块顺序</h4>${badges(opt.section_order)}
+          </div>
+          <div class="ksec">
+            <h4>核心关键词</h4>${badges(opt.skills_keywords_core)}
+            <div class="ksmall">可选关键词：${badges(opt.skills_keywords_optional)}</div>
+          </div>
+          <div class="ksec">
+            <h4>摘要（中文）</h4><div class="kcard">${esc(opt.summary_cn||"（暂无）")}</div>
+            <h4 style="margin-top:10px">Summary（English）</h4><div class="kcard">${esc(opt.summary_en||"（暂无）")}</div>
+          </div>
+          <div class="ksec">
+            <h4>职位标题建议</h4>${badges(opt.title_suggestions)}
+          </div>
+          ${jsonBox(opt)}
+        </div>`;
+      document.getElementById('optBlock').innerHTML = html;
     }
 
-    // 预热 + 超时控制（补丁A）
+    function renderATS(ats){
+      const html = `
+        <div class="ksec">
+          <div class="krow"><span class="kbadge">ATS 评分：${ats.score ?? 0}</span></div>
+          <h4>亮点匹配</h4>${list(ats.highlights)}
+          <h4>不匹配/需补充</h4>${list(ats.mismatch)}
+          <h4>建议加入的关键词</h4>${badges(ats.keywords)}
+          ${jsonBox(ats)}
+        </div>`;
+      document.getElementById('atsBlock').innerHTML = html;
+    }
+
+    function renderQA(data){
+      const qs = data.questions || [];
+      const tips = data.tips || [];
+      const qaHtml = qs.length ? qs.map((x,i)=>`
+        <div class="kcard">
+          <div><b>Q${i+1}：</b>${esc(x.q||"")}</div>
+          <div class="kmuted" style="margin-top:4px"><b>A：</b>${esc(x.a||"")}</div>
+        </div>`).join("") : "<div class='kmuted'>（暂无）</div>";
+      const html = `
+        <div class="ksec">
+          <h4>高频问题与答法</h4>${qaHtml}
+          <h4 style="margin-top:10px">面试提示</h4>${list(tips)}
+          ${jsonBox(data)}
+        </div>`;
+      document.getElementById('qaBlock').innerHTML = html;
+    }
+
+    function renderCareer(career){
+      const paths = career.paths || [];
+      const cards = paths.length ? paths.map(p=>`
+        <div class="kcard">
+          <div><b>方向：</b>${esc(p.title||"")}</div>
+          ${p.why_now?`<div class="kmuted" style="margin-top:6px"><b>Why now：</b>${esc(p.why_now)}</div>`:""}
+          <h4 style="margin-top:8px">90 天行动</h4>${list(p["90_day_plan"])}
+          <h4>需补齐的能力/经历</h4>${list(p.gap_to_fill)}
+          <h4>要建立的人脉</h4>${list(p.network_to_build)}
+          <h4>要学习的技能</h4>${list(p.skills_to_learn)}
+        </div>`).join("") : "<div class='kmuted'>（暂无）</div>";
+      const html = `<div class="ksec">${cards}${jsonBox(career)}</div>`;
+      document.getElementById('careerBlock').innerHTML = html;
+    }
+
+    /* ===== 总渲染 ===== */
+    let lastReport = null;
+    function renderReport(j){
+      lastReport = j||{};
+      renderOptimization(j.resume_optimization||{});
+      renderATS(j.ats||{});
+      renderQA(j.interview||{});
+      renderCareer(j.career||{});
+    }
+
+    /* ===== 预热 + 生成 ===== */
     async function runFull(){
       const btn=document.getElementById('goBtn');
       btn.disabled=true; btn.textContent='预热中…'; setBar(10);
-
-      // 预热健康检查，唤醒冷启动
-      try{ await fetch('/health', {cache:'no-store'}); }catch(e){}
-
+      try{ await fetch('/health',{cache:'no-store'}); }catch(_){}
       btn.textContent='生成中…'; setBar(15);
 
       const payload={
@@ -164,86 +247,58 @@
       const timer = setTimeout(()=>ctrl.abort(), 120000); // 120s 超时
 
       try{
-        const r = await fetch('/full_report',{
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(payload), signal: ctrl.signal
-        });
+        const r = await fetch('/full_report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:ctrl.signal});
         clearTimeout(timer);
-
         const raw = await r.text();
-        let j; try{ j=JSON.parse(raw); }catch{ throw new Error('后端返回的不是JSON：'+raw.slice(0,200)); }
+        let j; try{ j=JSON.parse(raw);}catch{ throw new Error('后端返回的不是JSON：'+raw.slice(0,200)); }
         if(!r.ok){ throw new Error(j.error || ('HTTP '+r.status)); }
-
         renderReport(j); setBar(100);
       }catch(e){
-        alert('生成失败：'+ (e.message || e));
-        setBar(0);
+        alert('生成失败：'+(e.message||e)); setBar(0);
       }finally{
         btn.disabled=false; btn.textContent='一键生成报告';
       }
     }
 
-    // 导出 DOCX
+    /* ===== 导出 DOCX ===== */
     async function exportDocx(){
       if(!lastReport){ return alert('请先生成报告'); }
       try{
-        const r = await fetch('/export_docx',{
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({report: lastReport})
-        });
+        const r = await fetch('/export_docx',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report:lastReport})});
         const blob = await r.blob();
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'AI_Resume_Report.docx'; a.click();
+        const a = document.createElement('a'); a.href=url; a.download='AI_Resume_Report.docx'; a.click();
         URL.revokeObjectURL(url);
-      }catch(e){
-        alert('导出失败：'+ (e.message||e));
-      }
+      }catch(e){ alert('导出失败：'+(e.message||e)); }
     }
 
-    // 在线职位匹配
+    /* ===== 在线职位匹配 ===== */
     async function doJobSearch(){
       setBar(20);
       try{
-        const js = {
-          resume_struct: lastReport?.resume_optimization || {},
-          target_role: (document.getElementById('target_role').value||'').trim(),
-          location: (document.getElementById('location').value||'').trim(),
-          industry: (document.getElementById('industry').value||'').trim(),
-          limit: 12
-        };
-        const r = await fetch('/job_search',{
-          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(js)
-        });
-        const raw = await r.text();
-        let j; try{ j=JSON.parse(raw);}catch{ throw new Error('返回的不是JSON：'+raw.slice(0,200)); }
+        const js={resume_struct:lastReport?.resume_optimization||{},target_role:(document.getElementById('target_role').value||'').trim(),location:(document.getElementById('location').value||'').trim(),industry:(document.getElementById('industry').value||'').trim(),limit:12};
+        const r=await fetch('/job_search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(js)});
+        const raw=await r.text(); let j; try{ j=JSON.parse(raw);}catch{ throw new Error('返回的不是JSON：'+raw.slice(0,200)); }
         if(!r.ok){ throw new Error(j.error || ('HTTP '+r.status)); }
-        renderJobs(j.jobs||[]);
-        setBar(100);
-      }catch(e){
-        alert('职位搜索失败：'+(e.message||e));
-        setBar(0);
-      }
+        renderJobs(j.jobs||[]); setBar(100);
+      }catch(e){ alert('职位搜索失败：'+(e.message||e)); setBar(0); }
     }
 
     function renderJobs(list){
-      const box = document.getElementById('jobsArea');
-      if(!list.length){ box.innerHTML = '<div class="muted">未找到匹配结果（可更换关键词或地点重试）。</div>'; return; }
-      box.innerHTML = list.map(j => `
+      const box=document.getElementById('jobsArea');
+      if(!list.length){ box.innerHTML='<div class="muted">未找到匹配结果（可更换关键词或地点重试）。</div>'; return; }
+      box.innerHTML=list.map(j=>`
         <div class="job">
-          <h4>${escapeHTML(j.title||'职位')}</h4>
-          <div class="muted">${escapeHTML(j.company||'')} · ${escapeHTML(j.location||'')}</div>
-          <div class="muted" style="margin:6px 0">${escapeHTML((j.desc||'').slice(0,180))}</div>
+          <h4>${esc(j.title||'职位')}</h4>
+          <div class="muted">${esc(j.company||'')} · ${esc(j.location||'')}</div>
+          <div class="muted" style="margin:6px 0">${esc((j.desc||'').slice(0,180))}</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span class="tag">来源：${escapeHTML(j.source||'')}</span>
+            <span class="tag">来源：${esc(j.source||'')}</span>
             <span class="tag">匹配度：${j.score||0}</span>
-            ${j.link ? `<a class="tag" href="${j.link}" target="_blank" rel="noopener">查看详情</a>`:''}
+            ${j.link?`<a class="tag" href="${j.link}" target="_blank" rel="noopener">查看详情</a>`:''}
           </div>
-        </div>
-      `).join('');
+        </div>`).join('');
     }
-
-    function escapeHTML(s){ return (s||'').replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m])); }
   </script>
 </body>
 </html>
