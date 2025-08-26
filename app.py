@@ -1,6 +1,7 @@
 import os, json, hashlib, re
 from flask import Flask, request, jsonify, render_template
 import requests
+from werkzeug.exceptions import HTTPException
 
 # ========================
 # 基础配置
@@ -26,20 +27,17 @@ def load_json_strict(s: str):
     - 去掉 ```/```json 代码围栏
     - 抓取首个 { ... } 块
     - 去掉末尾多余逗号
-    - 报错时把片段返回，便于定位
+    - 删除控制字符
+    解析失败会抛出可读错误，便于排查
     """
     if not isinstance(s, str):
         raise RuntimeError("LLM返回的非字符串内容")
     t = s.strip()
-    # 去除markdown代码围栏
     t = re.sub(r"^```(?:json)?\s*|\s*```$", "", t, flags=re.IGNORECASE | re.MULTILINE)
-    # 抓取第一个花括号JSON块
     m = re.search(r"\{.*\}", t, flags=re.S)
     if m:
         t = m.group(0)
-    # 删除对象/数组前的多余逗号 ,}
     t = re.sub(r",\s*([}\]])", r"\1", t)
-    # 删除不可见控制字符
     t = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", t)
     try:
         return json.loads(t)
@@ -292,6 +290,14 @@ def full_report():
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# ========================
+# 全局错误兜底（把任何HTML错误改成JSON返回）
+# ========================
+@app.errorhandler(Exception)
+def handle_any_error(e):
+    code = e.code if isinstance(e, HTTPException) else 500
+    return jsonify({"error": str(e)}), code
 
 # ========================
 # 本地启动
