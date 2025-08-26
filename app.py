@@ -389,11 +389,12 @@ def export_docx():
         return jsonify({"error": str(e)}), 500
 
 # ---------- 在线职位匹配 ----------
+# ---------- 在线职位匹配（Jooble + 回退 Arbeitnow） ----------
 @app.post("/job_search")
 def job_search():
     """
     入参：{ resume_struct, target_role, location, industry, limit }
-    返回：[{title, company, location, link, source, score}]
+    返回：{jobs: [{title, company, location, link, source, desc, score}]}
     """
     try:
         js = request.get_json(force=True)
@@ -401,50 +402,70 @@ def job_search():
         target_role = (js.get("target_role") or "").strip()
         location = (js.get("location") or "").strip()
         industry = (js.get("industry") or "").strip()
-        limit = int(js.get("limit", 8))
+        limit = int(js.get("limit", 10))
 
-        # 1) 关键词：从解析/优化里抽取
+        # 1) 关键词集合（来自解析 + 目标职位）
         keywords = set()
         for k in (resume_struct.get("skills_core") or []) + (resume_struct.get("keywords") or []):
-            if isinstance(k,str) and len(k)<=30: keywords.add(k.lower())
-        if target_role: keywords |= set(target_role.lower().split())
-
+            if isinstance(k, str) and 1 <= len(k) <= 30:
+                keywords.add(k.lower())
+        if target_role:
+            for t in re.split(r"[ /,;、，]+", target_role):
+                if t: keywords.add(t.lower())
+        kw_list = list(keywords)[:8]
         results = []
 
-        # 2) Jooble（推荐：免费 Key；全球范围，含中国部分）
+        # 2) Jooble（需要环境变量 JOOBLE_API_KEY）
         if JOOBLE_API_KEY:
             payload = {
-                "keywords": target_role or " ".join(list(keywords)[:5]),
+                "keywords": target_role or " ".join(kw_list) or "engineer",
                 "location": location or "",
-                "searchMode": 1,
                 "page": 1,
+                "searchMode": 1,
                 "radius": 40
             }
             try:
                 r = requests.post(JOOBLE_ENDPOINT.format(JOOBLE_API_KEY), json=payload, timeout=30)
                 if r.status_code == 200:
                     data = r.json().get("jobs", [])
-                    for j in data[:30]:
+                    for j in data[:40]:
                         results.append({
                             "title": j.get("title"),
                             "company": j.get("company"),
                             "location": j.get("location"),
                             "link": j.get("link"),
                             "source": "Jooble",
-                            "desc": (j.get("snippet") or "")[:400]
+                            "desc": (j.get("snippet") or "")[:500]
                         })
+                else:
+                    print("JOOBLE_HTTP", r.status_code, r.text[:200])
             except Exception as e:
                 print("JOOBLE_ERR", e)
 
-        # 3) 没有 API key 的情况下，先返回引导
-        if not results and not JOOBLE_API_KEY:
-            return jsonify({"error": "未配置职位搜索 API key。请在 Render → Environment 添加 JOOBLE_API_KEY（免费），再试。"}), 400
+        # 3) 回退源：Arbeitnow
+        if not results:
+            try:
+                url = "https://www.arbeitnow.com/api/job-board-api"
+                r = requests.get(url, timeout=25)
+                if r.status_code == 200:
+                    items = r.json().get("data", [])[:50]
+                    for it in items:
+                        results.append({
+                            "title": it.get("title"),
+                            "company": it.get("company_name"),
+                            "location": (it.get("location") or "") + (" | Remote" if it.get("remote") else ""),
+                            "link": it.get("url"),
+                            "source": "Arbeitnow",
+                            "desc": (it.get("description") or "")[:500]
+                        })
+            except Exception as e:
+                print("ARBEITNOW_ERR", e)
 
-        # 4) 简单匹配度：关键词覆盖比 + 角色/地区加成
+        # 4) 简单匹配度
         def score(job):
             text = " ".join([job.get("title",""), job.get("desc","")]).lower()
             hit = sum(1 for k in keywords if k and k in text)
-            base = 60 * (hit / max(len(keywords),1))
+            base = 60 * (hit / max(len(keywords), 1))
             if target_role and target_role.lower() in text: base += 15
             if location and location.lower() in (job.get("location","").lower()): base += 10
             return round(min(100, base), 1)
@@ -453,6 +474,9 @@ def job_search():
             j["score"] = score(j)
 
         results = sorted(results, key=lambda x: x["score"], reverse=True)[:limit]
+        if not results and not JOOBLE_API_KEY:
+            return jsonify({"error": "未配置 JOOBLE_API_KEY；已尝试回退源。"}), 400
+
         return jsonify({"jobs": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
