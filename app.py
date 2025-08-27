@@ -4,6 +4,7 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
 
+# 可选：docx 解析
 try:
     from docx import Document
     HAS_DOCX = True
@@ -12,7 +13,7 @@ except Exception:
 
 app = Flask(__name__)
 
-# ========= 环境 =========
+# =============== 环境配置 ===============
 LLM_API_BASE = os.getenv("LLM_API_BASE") or os.getenv("OPENAI_BASE_URL") or "https://api.deepseek.com"
 LLM_API_KEY  = os.getenv("LLM_API_KEY")  or os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
 DEFAULT_MODEL = os.getenv("LLM_MODEL") or os.getenv("MODEL_NAME") or "deepseek-reasoner"
@@ -25,7 +26,7 @@ MAX_JD_CHARS        = int(os.getenv("MAX_JD_CHARS", "10000"))
 
 BRAND_NAME = "Alsos AI Resume"
 
-# ========= 缓存 =========
+# =============== 简易 LRU 缓存 ===============
 class LRUCache:
     def __init__(self, capacity=200):
         self.cap = capacity
@@ -46,7 +47,7 @@ class LRUCache:
 
 cache = LRUCache(200)
 
-# ========= 工具 =========
+# =============== 工具函数 ===============
 def clean_text(s: str) -> str:
     if not s: return ""
     s = s.replace("\r", "\n")
@@ -102,19 +103,19 @@ def call_llm(payload, json_mode=True):
 def make_payload(messages, model, temperature=0.25, max_tokens=MAX_TOKENS_DEFAULT):
     return {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
 
-# ========= 预分析（给 Level 判定加硬约束） =========
+# =============== Level 锚点（预分析） ===============
 LEVEL_ORDER = {"Junior":0, "Middle":1, "Senior":2, "Executive":3}
 
 SENIOR_KEYWORDS = [
-    "副总裁","VP","Vice President","总监","Director","执行总监","Executive Director","负责人","Head","HRD",
-    "Chief","首席","CXO","合伙人","Partner","总经理","GM","HRVP","HR Head","事业部负责人"
+    "副总裁","VP","Vice President","总监","Director","执行总监","Executive Director",
+    "负责人","Head","HRD","Chief","首席","CXO","合伙人","Partner","总经理","GM","HRVP","HR Head"
 ]
 MIDDLE_KEYWORDS = ["经理","Manager","资深","Senior","主管","Lead","Leader","负责人"]
 
 def quick_pre_analyze(text: str):
     now = datetime.datetime.utcnow().year
     years = re.findall(r"(19|20)\d{2}", text)
-    years = [int(y if len(y)==4 else "2000") for y in years]  # 粗略
+    years = [int(y if len(y)==4 else "2000") for y in years]
     years = [y for y in years if 1980 <= y <= now]
     span = 0
     if years:
@@ -122,23 +123,18 @@ def quick_pre_analyze(text: str):
         span = max(1, min(span, 40))
 
     lower_txt = text.lower()
-    title_signals = []
-    for kw in SENIOR_KEYWORDS + MIDDLE_KEYWORDS:
-        if kw.lower() in lower_txt:
-            title_signals.append(kw)
 
-    # 设定 Level 下限（anchor）
     if any(kw.lower() in lower_txt for kw in ["vp","vice president","chief","首席","cxo","hrvp","合伙人","partner"]):
         anchor = "Executive"
         reason = "检测到 VP/Chief/合伙人等高阶头衔"
-    elif any(kw.lower() in lower_txt for kw in ["总监","director","hrd","head","负责人","executive director"] ) or span >= 12:
+    elif any(kw.lower() in lower_txt for kw in ["总监","director","hrd","head","负责人","executive director"]) or span >= 12:
         anchor = "Senior"
         reason = "总监/HRD/Head 等头衔或年限≥12"
     elif any(kw.lower() in lower_txt for kw in ["经理","manager","资深","senior","主管","lead"]) or span >= 6:
         anchor = "Middle"
         reason = "经理/资深/主管等头衔或年限≥6"
     elif span >= 3:
-        anchor = "Middle"  # 不轻易判到 Junior
+        anchor = "Middle"
         reason = "年限≥3，保底不低于 Middle"
     else:
         anchor = "Junior"
@@ -146,12 +142,11 @@ def quick_pre_analyze(text: str):
 
     return {
         "years_span_estimate": span,
-        "title_signals": list(sorted(set(title_signals))),
         "anchor_min_level": anchor,
         "anchor_reason": reason
     }
 
-# ========= 降级/补位 =========
+# =============== 降级/补位 ===============
 def _fallback_from_raw(raw: str, section: str):
     return {"_raw_preview": (raw or "")[:1200], "_note": "解析失败，展示原文片段供参考。"}
 
@@ -179,7 +174,7 @@ def _ensure_nonempty(section: str, obj: dict):
         obj.setdefault("salary_insights", {"title":"","city":"","currency":"CNY","low":0,"mid":0,"high":0,"factors":[],"notes":"模型估算，供参考"})
     return obj
 
-# ========= 页面 =========
+# =============== 页面 ===============
 @app.route("/")
 def index():
     return render_template("index.html", brand=BRAND_NAME)
@@ -198,7 +193,20 @@ def extract_text():
         return jsonify({"ok": False, "error": "仅支持 .txt / .docx"}), 400
     return jsonify({"ok": True, "text": clean_text(text)})
 
-# ========= 主流程（SSE） =========
+# =============== 模型路由（平衡模式） ===============
+def model_for(section: str, mode: str):
+    # 极速：全 chat
+    if mode in ("speed", "fast"):
+        return "deepseek-chat", 2800
+    # 平衡：只对“需要推理”的块用 reasoner
+    if mode == "balanced":
+        if section in ["personalized_strategy", "interview", "career_diagnosis", "career_level"]:
+            return "deepseek-reasoner", 6000
+        return "deepseek-chat", 2800
+    # 深度：全 reasoner
+    return "deepseek-reasoner", 8000
+
+# =============== 主流程（SSE） ===============
 @app.route("/optimize_stream", methods=["POST"])
 def optimize_stream():
     t0 = time.time()
@@ -209,11 +217,12 @@ def optimize_stream():
     target_location = clean_text(data.get("target_location",""))
     target_industry = clean_text(data.get("target_industry",""))
 
-    model_choice = (data.get("model") or "").strip().lower()
-    if model_choice in ("speed","fast"):
-        model, per_call_tokens = "deepseek-chat", 3000
-    else:
-        model, per_call_tokens = "deepseek-reasoner", 8000
+    mode = (data.get("model") or "").strip().lower()  # depth / balanced / speed
+
+    # 加速：平衡/极速模式时做轻压缩
+    if mode in ("speed","fast","balanced"):
+        resume_text = compress_context(resume_text, 6500)
+        job_description = compress_context(job_description, 4500)
 
     if not LLM_API_KEY:
         return jsonify({"ok": False, "error": "未配置 LLM API key"}), 500
@@ -230,14 +239,15 @@ def optimize_stream():
         "target_title": target_title,
         "target_location": target_location,
         "target_industry": target_industry,
-        "pre_analysis": pre            # 给到模型 & 供纠偏
+        "pre_analysis": pre
     }
     has_jd = bool(job_description)
 
+    # ---------- Prompts ----------
     prompts = {
         "summary_highlights": f"""你是"{BRAND_NAME}"的资深猎头。仅输出 JSON（中文）：
 {{"summary":"<160-220字职业概要>","highlights":["…"]}}
-- 必须写中文、温和、专业；
+- 必须中文、温和、专业；
 - highlights ≥ 8 条；每条 20-60 字；包含场景/动作/结果（数字/规模/指标）；拒绝空话。""",
 
         "improvements": """仅输出 JSON（中文）：
@@ -246,10 +256,9 @@ def optimize_stream():
 
         "career_diagnosis": """仅输出 JSON（中文）：
 {"career_diagnosis":[{"issue":"","risk":"","advice":""}, ...]}
-- 6–10 条；围绕：跳槽频繁、履历断层、教育背景一般、单一文化/单一行业、职责堆砌无结果、管理跨度不足、对外成果少、平台选择偏差；
-- “advice”必须是具体动作（如“在现公司稳定 2-3 年并拿到 X 类量化成果；对外发布作品集”）。""",
+- 6–10 条；围绕：跳槽频繁、履历断层、教育一般、单一文化/行业、职责堆砌、管理跨度不足、成果对外可见度低、平台选择偏差；
+- “advice”必须是具体动作（如“稳定 2-3 年并拿到 X 类量化成果；对外发布作品集”）。""",
 
-        # —— 关键：引入 anchor 下限
         "career_level": """仅输出 JSON（中文）：
 {"career_level_analysis":{
   "level":"Junior|Middle|Senior|Executive",
@@ -312,7 +321,7 @@ def optimize_stream():
     phase1_results = {}
 
     def run_section(section, extra_ctx=None):
-        ck_raw = {"base": base_user, "sec": section, "model": model, "extra": extra_ctx}
+        ck_raw = {"base": base_user, "sec": section, "mode": mode, "extra": extra_ctx}
         ck = hashlib.sha256(json.dumps(ck_raw, ensure_ascii=False).encode()).hexdigest()
         cached = cache.get(ck)
         if cached is not None:
@@ -321,9 +330,11 @@ def optimize_stream():
         user_payload = dict(base_user)
         if extra_ctx: user_payload["prior_findings"] = extra_ctx
 
-        msgs=[{"role":"system","content":prompts[section]},
-              {"role":"user","content":json.dumps(user_payload,ensure_ascii=False)}]
-        payload = make_payload(msgs, model=model, max_tokens=per_call_tokens)
+        messages=[{"role":"system","content":prompts[section]},
+                  {"role":"user","content":json.dumps(user_payload,ensure_ascii=False)}]
+
+        sec_model, sec_tokens = model_for(section, mode)
+        payload = make_payload(messages, model=sec_model, max_tokens=sec_tokens)
 
         try:
             with ThreadPoolExecutor(max_workers=1) as inner:
@@ -337,11 +348,12 @@ def optimize_stream():
 
             obj = _ensure_nonempty(section, obj)
 
-            # —— 判级结果低于 anchor 时，做系统纠偏
+            # 低于锚点时自动纠偏
             if section == "career_level" and isinstance(obj.get("career_level_analysis"), dict):
                 level = obj["career_level_analysis"].get("level","-")
                 a_min = base_user["pre_analysis"]["anchor_min_level"]
-                if level in LEVEL_ORDER and LEVEL_ORDER.get(level,0) < LEVEL_ORDER.get(a_min,0):
+                order = LEVEL_ORDER
+                if level in order and order.get(level,0) < order.get(a_min,0):
                     obj["career_level_analysis"]["reason"] = (obj["career_level_analysis"].get("reason","") +
                         f"（系统基于年限/头衔纠偏：最低不低于 {a_min}）")
                     obj["career_level_analysis"]["level"] = a_min
@@ -381,8 +393,7 @@ def optimize_stream():
             yield f"data: {json.dumps(item,ensure_ascii=False)}\n\n"
             need2.discard(item["section"])
 
-        meta={"elapsed_ms":int((time.time()-t0)*1000),"model":model,"has_jd":has_jd,
-              "pre_analysis":pre}
+        meta={"elapsed_ms":int((time.time()-t0)*1000),"mode":mode,"has_jd":has_jd,"pre_analysis":pre}
         yield f"data: {json.dumps({'section':'done','data':{'meta':meta}},ensure_ascii=False)}\n\n"
 
     headers={"Content-Type":"text/event-stream; charset=utf-8",
