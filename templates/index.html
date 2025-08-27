@@ -5,19 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Alsos AI Resume · 求职助手</title>
 <style>
-  :root{
-    --bg:#F3F2EF;--card:#fff;--text:#111827;--muted:#6B7280;--border:#E5E7EB;
-    --brand:#0D3B2E;--brand-weak:#E7F0ED;--accent:#0f5a45;--warn:#fffbe6;--warn-b:#f5e79f;
-  }
+  :root{--bg:#F3F2EF;--card:#fff;--text:#111827;--muted:#6B7280;--border:#E5E7EB;
+        --brand:#0D3B2E;--brand-weak:#E7F0ED;--warn:#fffbe6;--warn-b:#f5e79f;}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif}
+       font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif}
 
   .topbar{height:56px;background:var(--card);border-bottom:1px solid var(--border);
-    display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:10}
+          display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:10}
   .brand{font-weight:800;color:var(--brand)} .hint{color:var(--muted);font-size:12px}
 
-  .container{max-width:1100px;margin:16px auto;padding:0 12px;display:grid;grid-template-columns:360px 1fr;gap:16px}
+  .container{max-width:1100px;margin:16px auto;padding:0 12px;
+             display:grid;grid-template-columns:360px 1fr;gap:16px;align-items:start}
   @media (max-width:980px){.container{grid-template-columns:1fr}}
 
   .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.03)}
@@ -47,6 +46,10 @@
   @keyframes s{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
   .error{background:#fff1f2;border:1px solid #fecdd3;color:#7f1d1d;border-radius:8px;padding:8px 10px}
+
+  /* 关键：固定右侧区域在第二列 */
+  .progress-card{grid-column:2 / -1}
+  #feed{grid-column:2 / -1; display:flex; flex-direction:column; gap:16px}
 </style>
 </head>
 <body>
@@ -56,6 +59,7 @@
   </div>
 
   <div class="container">
+    <!-- 左列：输入 -->
     <div class="card">
       <div class="section-title">输入区</div>
       <div class="body">
@@ -74,7 +78,8 @@
       </div>
     </div>
 
-    <div class="card">
+    <!-- 右列：进度 + 输出 -->
+    <div class="card progress-card">
       <div class="section-title">正在分析简历</div>
       <div class="content">
         <div class="progress-wrap"><div class="progress-bar" id="pgbar">0%</div></div>
@@ -88,13 +93,8 @@
 <script>
 const $ = s => document.querySelector(s);
 const feed = $("#feed");
-let controller = null;
-let watchdog = null;
-let progressTimer = null;
-let baseProgress = 0;
-let sectionsDone = 0;
-let sectionsTotal = 8; // 初始估计，后续根据 done 的 has_jd 修正
-let slowHintShown = false;
+let controller = null, watchdog = null, progressTimer = null;
+let baseProgress = 0, sectionsDone = 0, sectionsTotal = 8, slowHintShown = false;
 
 const SECTION_TITLES = {
   "summary_highlights":"📌 概览 / 亮点",
@@ -108,194 +108,100 @@ const SECTION_TITLES = {
 };
 
 function escapeHtml(s){return (s||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-function card(id, title, inner=""){
-  const el = document.createElement("div");
-  el.className="card"; el.id=id;
-  el.innerHTML=`<div class="title">${title}</div><div class="content">${inner}</div>`;
-  feed.appendChild(el);
-  return el.querySelector(".content");
-}
-function ensureSkeleton(section){
-  const id = `sec-${section}`;
-  if(document.getElementById(id)) return;
-  const c = card(id, SECTION_TITLES[section]||section, `
-    <div class="skeleton" style="width:70%"></div>
-    <div class="skeleton" style="width:90%"></div>
-    <div class="skeleton" style="width:60%"></div>`);
-  return c;
-}
-function showError(section, msg){
-  const id = `sec-${section}`;
-  const el = document.getElementById(id) || card(id, SECTION_TITLES[section]||section);
-  el.innerHTML = `<div class="error">⚠️ ${escapeHtml(msg||"未知错误")}</div>`;
-}
-function updateProgress(realDone=false){
-  if(!realDone){
-    baseProgress = Math.min(80, baseProgress + (Math.random()*1.5+0.5)); // 缓慢模拟到 80%
-  }
-  const logical = Math.floor((sectionsDone/Math.max(1,sectionsTotal))*100);
-  const percent = Math.max(Math.min(100, logical), Math.floor(baseProgress));
-  const bar = $("#pgbar");
-  bar.style.width = percent + "%";
-  bar.textContent = percent + "%";
-}
+function card(id, title, inner=""){const el=document.createElement("div");el.className="card";el.id=id;el.innerHTML=`<div class="title">${title}</div><div class="content">${inner}</div>`;feed.appendChild(el);return el.querySelector(".content");}
+function ensureSkeleton(section){const id=`sec-${section}`;if(document.getElementById(id))return;card(id,SECTION_TITLES[section]||section,`<div class="skeleton" style="width:70%"></div><div class="skeleton" style="width:90%"></div><div class="skeleton" style="width:60%"></div>`);}
+function showError(section,msg){const id=`sec-${section}`;const el=document.getElementById(id) || card(id,SECTION_TITLES[section]||section);el.innerHTML=`<div class="error">⚠️ ${escapeHtml(msg||"未知错误")}</div>`;}
+function updateProgress(real=false){if(!real){baseProgress=Math.min(80,baseProgress+(Math.random()*1.5+0.5));}const logical=Math.floor((sectionsDone/Math.max(1,sectionsTotal))*100);const pct=Math.max(Math.min(100,logical),Math.floor(baseProgress));const bar=$("#pgbar");bar.style.width=pct+"%";bar.textContent=pct+"%";}
 
 function renderPiece(section, data){
-  const id = `sec-${section}`;
-  let el = document.getElementById(id)?.querySelector(".content");
-  if(!el){ el = card(id, SECTION_TITLES[section]||section); }
-
-  if(!data || Object.keys(data).length===0){
-    el.innerHTML = `<div class="skeleton" style="width:85%"></div>
-                    <div class="skeleton" style="width:70%"></div>`;
-    return;
-  }
+  const id=`sec-${section}`;let el=document.getElementById(id)?.querySelector(".content");
+  if(!el){ el=card(id,SECTION_TITLES[section]||section); }
+  if(!data || Object.keys(data).length===0){ el.innerHTML=`<div class="skeleton" style="width:85%"></div><div class="skeleton" style="width:70%"></div>`; return; }
 
   if(section==="summary_highlights"){
-    const s = data.summary || "";
-    const hl = data.highlights || [];
-    el.innerHTML = `<div class="banner">引擎：Alsos AI Resume</div>
-                    <p>${escapeHtml(s)}</p>
-                    ${hl.length? `<ul>${hl.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>`:"<div class='muted'>亮点待补充</div>"}`;
-  }
-  else if(section==="improvements"){
-    const arr = data.resume_improvements||[];
-    el.innerHTML = arr.length? arr.map((it,i)=>`
-      <div style="margin-bottom:10px">
-        <div><b>${i+1}. 问题点：</b>${escapeHtml(it.issue||"")}</div>
-        <div><b>改进方案：</b>${escapeHtml(it.fix||"")}</div>
-        <div class="muted"><b>原因：</b>${escapeHtml(it.why||"")}</div>
-      </div>`).join("") : "<div class='muted'>暂无</div>";
-  }
-  else if(section==="career_diagnosis"){
-    const items = (data.career_diagnosis||[]).map((it,i)=>`
-      <div style="margin-bottom:10px">
-        <div><b>${i+1}. 发现：</b>${escapeHtml(it.issue||"")}</div>
-        <div><b>风险：</b>${escapeHtml(it.risk||"")}</div>
-        <div class="muted"><b>应对策略：</b>${escapeHtml(it.advice||"")}</div>
-      </div>`).join("");
+    const s=data.summary||"", hl=data.highlights||[];
+    el.innerHTML=`<div class="banner">引擎：Alsos AI Resume</div><p>${escapeHtml(s)}</p>${hl.length?`<ul>${hl.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>`:"<div class='muted'>亮点待补充</div>"}`;
+  } else if(section==="improvements"){
+    const arr=data.resume_improvements||[];
+    el.innerHTML = arr.length? arr.map((it,i)=>`<div style="margin-bottom:10px"><div><b>${i+1}. 问题点：</b>${escapeHtml(it.issue||"")}</div><div><b>改进方案：</b>${escapeHtml(it.fix||"")}</div><div class="muted"><b>原因：</b>${escapeHtml(it.why||"")}</div></div>`).join("") : "<div class='muted'>暂无</div>";
+  } else if(section==="career_diagnosis"){
+    const items=(data.career_diagnosis||[]).map((it,i)=>`<div style="margin-bottom:10px"><div><b>${i+1}. 发现：</b>${escapeHtml(it.issue||"")}</div><div><b>风险：</b>${escapeHtml(it.risk||"")}</div><div class="muted"><b>应对策略：</b>${escapeHtml(it.advice||"")}</div></div>`).join("");
     el.innerHTML = items || "<div class='muted'>未检出明显风险</div>";
-  }
-  else if(section==="career_level"){
-    const a = data.career_level_analysis||{};
-    const f = a.interview_focus||{};
-    el.innerHTML = `
-      <div><b>判定 Level：</b>${escapeHtml(a.level||"-")} <span class="muted">（理由：${escapeHtml(a.reason||"-")}）</span></div>
-      <div style="margin-top:8px"><b>发展路径建议：</b><ul>${(a.path||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-      <div style="margin-top:8px"><b>不同 Level 面试关注点：</b>
-        <div><i>Junior</i><ul>${(f.junior||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-        <div><i>Middle</i><ul>${(f.middle||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-        <div><i>Senior</i><ul>${(f.senior||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-        <div><i>Executive</i><ul>${(f.executive||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-      </div>`;
-  }
-  else if(section==="personalized_strategy"){
-    const st = data.strategy||{};
-    el.innerHTML = `
-      <div class="muted">判断依据：${escapeHtml(st.assumptions||"")}</div>
-      <div style="margin-top:8px"><b>短期（3-6个月）：</b><ul>${(st.short_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-      <div><b>中期（6-18个月）：</b><ul>${(st.mid_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-      <div><b>长期（18个月+）：</b><ul>${(st.long_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-      ${(st.if_job_hopping&&st.if_job_hopping.length)?`<div><b>跳槽频繁专项：</b><ul>${st.if_job_hopping.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`:""}
-    `;
-  }
-  else if(section==="interview"){
-    const ih = data.interview_handbook||{};
-    el.innerHTML = `
-      <div><b>回答逻辑：</b><ul>${(ih.answer_logic||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-      <div><b>不同面试官关注点：</b>
-        <div><i>HR</i><ul>${(ih.interviewer_focus?.HR||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-        <div><i>部门负责人</i><ul>${(ih.interviewer_focus?.hiring_manager||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-        <div><i>老板/高层</i><ul>${(ih.interviewer_focus?.executive||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
-      </div>
-      <div><b>STAR 项目答题提示（3 套）：</b>
-        <ol>${(ih.star_sets||[]).map(s=>`<li><b>${escapeHtml(s.project_title||"项目")}</b> · ${escapeHtml(s.question||"")}<ul>${(s.how_to_answer||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></li>`).join("")}</ol>
-      </div>
-      <div><b>风险点应对：</b><ul>${(ih.risk_mitigation||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`;
-  }
-  else if(section==="ats"){
-    const ats = data.ats||{};
-    if(!ats.enabled){ el.innerHTML = "<div class='muted'>未提供 JD，未进行 ATS 评分。</div>"; return; }
-    const bar = n=>`<div style='display:flex;gap:10px;align-items:center;margin:4px 0'>
+  } else if(section==="career_level"){
+    const a=data.career_level_analysis||{}, f=a.interview_focus||{};
+    el.innerHTML=`<div><b>判定 Level：</b>${escapeHtml(a.level||"-")} <span class="muted">（理由：${escapeHtml(a.reason||"-")}）</span></div>
+    <div style="margin-top:8px"><b>发展路径建议：</b><ul>${(a.path||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div style="margin-top:8px"><b>不同 Level 面试关注点：</b>
+      <div><i>Junior</i><ul>${(f.junior||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+      <div><i>Middle</i><ul>${(f.middle||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+      <div><i>Senior</i><ul>${(f.senior||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+      <div><i>Executive</i><ul>${(f.executive||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    </div>`;
+  } else if(section==="personalized_strategy"){
+    const st=data.strategy||{};
+    el.innerHTML=`<div class="muted">判断依据：${escapeHtml(st.assumptions||"")}</div>
+    <div style="margin-top:8px"><b>短期（3-6个月）：</b><ul>${(st.short_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div><b>中期（6-18个月）：</b><ul>${(st.mid_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div><b>长期（18个月+）：</b><ul>${(st.long_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    ${(st.if_job_hopping&&st.if_job_hopping.length)?`<div><b>跳槽频繁专项：</b><ul>${st.if_job_hopping.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`:""}`;
+  } else if(section==="interview"){
+    const ih=data.interview_handbook||{};
+    el.innerHTML=`<div><b>回答逻辑：</b><ul>${(ih.answer_logic||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    <div><b>不同面试官关注点：</b>
+      <div><i>HR</i><ul>${(ih.interviewer_focus?.HR||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+      <div><i>部门负责人</i><ul>${(ih.interviewer_focus?.hiring_manager||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+      <div><i>老板/高层</i><ul>${(ih.interviewer_focus?.executive||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+    </div>
+    <div><b>STAR 项目答题提示（3 套）：</b><ol>${(ih.star_sets||[]).map(s=>`<li><b>${escapeHtml(s.project_title||"项目")}</b> · ${escapeHtml(s.question||"")}<ul>${(s.how_to_answer||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></li>`).join("")}</ol></div>
+    <div><b>风险点应对：</b><ul>${(ih.risk_mitigation||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`;
+  } else if(section==="ats"){
+    const ats=data.ats||{}; if(!ats.enabled){ el.innerHTML="<div class='muted'>未提供 JD，未进行 ATS 评分。</div>"; return; }
+    const bar=n=>`<div style='display:flex;gap:10px;align-items:center;margin:4px 0'>
       <div style='flex:1;height:12px;background:#EEF2F3;border:1px solid #E5E7EB;border-radius:999px;overflow:hidden'>
         <div style='height:100%;background:#0D3B2E;width:${Math.max(0,Math.min(100,Number(n||0)))}%'></div>
       </div><span class='muted' style='width:48px;text-align:right'>${n||0}/100</span></div>`;
-    const rs = ats.reasons||{};
-    el.innerHTML = `
-      <div><b>总分：</b>${bar(ats.total_score||0)}</div>
-      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px;">
-        <div><b>技能</b>${bar(ats.sub_scores?.skills||0)}<div class="muted">${(rs.skills||[]).join(" · ")}</div></div>
-        <div><b>经验</b>${bar(ats.sub_scores?.experience||0)}<div class="muted">${(rs.experience||[]).join(" · ")}</div></div>
-        <div><b>教育</b>${bar(ats.sub_scores?.education||0)}<div class="muted">${(rs.education||[]).join(" · ")}</div></div>
-        <div><b>关键词</b>${bar(ats.sub_scores?.keywords||0)}<div class="muted">${(rs.keywords||[]).join(" · ")}</div></div>
-      </div>
-      <div style="margin-top:8px;"><b>缺口关键词：</b>${(ats.gap_keywords||[]).map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join("")}</div>
-      <div style="margin-top:8px;"><b>优化建议：</b><ul>${(ats.improvement_advice||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`;
-  }
-  else if(section==="salary"){
-    const s = data.salary_insights||{}, c = s.currency||"CNY";
-    const line = (label,val,min,max)=>{
-      const hi=Number(max||0), lo=Number(min||0), v=Number(val||0);
-      const pct = hi>lo ? Math.max(5,Math.min(100,Math.round((v-lo)/(hi-lo)*100))) : 5;
-      return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0">
-        <div style="width:36px" class="muted">${label}</div>
-        <div style="flex:1;height:12px;background:#EEF2F3;border:1px solid #E5E7EB;border-radius:999px;overflow:hidden">
-          <div style="height:100%;background:#0D3B2E;width:${pct}%"></div>
-        </div>
-        <div style="width:120px;text-align:right" class="muted">${c} ${v}</div></div>`;
-    };
-    el.innerHTML = `<div><b>${escapeHtml(s.city||"-")} · ${escapeHtml(s.title||"-")}</b></div>
-      ${line("低位",s.low,s.low,s.high)}${line("中位",s.mid,s.low,s.high)}${line("高位",s.high,s.low,s.high)}
-      <div class="muted">影响因子：${(s.factors||[]).join(" · ")}</div>
-      <div class="muted">${escapeHtml(s.notes||"模型估算，供参考")}</div>`;
-  }
-  else {
-    // —— 兜底：展示原文片段或原始 JSON
+    const rs=ats.reasons||{};
+    el.innerHTML=`<div><b>总分：</b>${bar(ats.total_score||0)}</div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px;">
+      <div><b>技能</b>${bar(ats.sub_scores?.skills||0)}<div class="muted">${(rs.skills||[]).join(" · ")}</div></div>
+      <div><b>经验</b>${bar(ats.sub_scores?.experience||0)}<div class="muted">${(rs.experience||[]).join(" · ")}</div></div>
+      <div><b>教育</b>${bar(ats.sub_scores?.education||0)}<div class="muted">${(rs.education||[]).join(" · ")}</div></div>
+      <div><b>关键词</b>${bar(ats.sub_scores?.keywords||0)}<div class="muted">${(rs.keywords||[]).join(" · ")}</div></div>
+    </div>
+    <div style="margin-top:8px;"><b>缺口关键词：</b>${(ats.gap_keywords||[]).map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join("")}</div>
+    <div style="margin-top:8px;"><b>优化建议：</b><ul>${(ats.improvement_advice||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`;
+  } else {
     if(data && data._raw_preview){
-      el.innerHTML = `<div class="error">⚠️ 该模块返回结构不完整，已降级展示原文片段：</div>
-                      <pre style="white-space:pre-wrap">${escapeHtml(data._raw_preview)}</pre>`;
+      el.innerHTML=`<div class="error">⚠️ 该模块返回结构不完整，已降级展示原文片段：</div><pre style="white-space:pre-wrap">${escapeHtml(data._raw_preview)}</pre>`;
     }else{
-      el.innerHTML = `<div class="muted">已收到内容，但结构较空，原始数据：</div>
-                      <pre style="white-space:pre-wrap">${escapeHtml(JSON.stringify(data||{},null,2))}</pre>`;
+      el.innerHTML=`<div class="muted">已收到内容，但结构较空，原始数据：</div><pre style="white-space:pre-wrap">${escapeHtml(JSON.stringify(data||{},null,2))}</pre>`;
     }
   }
 }
 
 function armWatchdog(mode){
   clearTimeout(watchdog); slowHintShown=false;
-  watchdog = setTimeout(()=>{
-    if(slowHintShown) return;
-    slowHintShown = true;
-    const tip = document.createElement("div");
-    tip.className="card";
-    tip.innerHTML = `<div class="title">⏳ 正在努力生成</div>
-      <div class="content">
-        <div class="muted">思考模式在长文档情况下可能较慢。你可以继续等待，或尝试“极速模式”以先获得首版报告。</div>
-        <div style="margin-top:8px">
-          <button class="btn btn-ghost" id="retryFast">切换极速模式重试</button>
-        </div>
-      </div>`;
-    feed.prepend(tip);
-    $("#retryFast").onclick = ()=>{ cancelStream(); startStream("speed"); };
-  }, 90000); // 90 秒无输出时提示
+  watchdog=setTimeout(()=>{
+    if(slowHintShown) return; slowHintShown=true;
+    const tip=document.createElement("div"); tip.className="card";
+    tip.innerHTML=`<div class="title">⏳ 正在努力生成</div><div class="content">
+      <div class="muted">思考模式在长文档情况下可能较慢。你可以继续等待，或尝试“极速模式”以先获得首版报告。</div>
+      <div style="margin-top:8px"><button class="btn btn-ghost" id="retryFast">切换极速模式重试</button></div></div>`;
+    feed.prepend(tip); $("#retryFast").onclick=()=>{ cancelStream(); startStream("speed"); };
+  }, 90000);
 }
 
 async function startStream(mode="depth"){
-  feed.innerHTML = "";
-  sectionsDone = 0; baseProgress = 0; sectionsTotal = 8;
-  updateProgress(true);
+  feed.innerHTML=""; sectionsDone=0; baseProgress=0; sectionsTotal=8; updateProgress(true);
   $("#btnCancel").style.display="inline-flex";
 
   ["career_diagnosis","improvements","summary_highlights","career_level",
    "personalized_strategy","interview","salary","ats"].forEach(ensureSkeleton);
 
-  clearInterval(progressTimer);
-  progressTimer = setInterval(()=>updateProgress(false), 800);
+  clearInterval(progressTimer); progressTimer=setInterval(()=>updateProgress(false),800);
+  controller=new AbortController(); armWatchdog(mode);
 
-  controller = new AbortController();
-  armWatchdog(mode);
-
-  const body = {
+  const body={
     resume_text: $("#resumeText").value.trim(),
     job_description: $("#jobDescription").value.trim(),
     target_title: $("#targetTitle").value.trim(),
@@ -305,84 +211,46 @@ async function startStream(mode="depth"){
   };
   if(!body.resume_text){ alert("请粘贴简历文本或上传文件"); cancelStream(); return; }
 
-  const res = await fetch("/optimize_stream",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(body),
-    signal: controller.signal
-  });
-
+  const res=await fetch("/optimize_stream",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:controller.signal});
   if(!res.ok){ cancelStream(); feed.innerHTML=`<div class="card"><div class="title">服务异常</div><div class="content">请稍后再试</div></div>`; return; }
 
-  const decoder = new TextDecoder("utf-8");
-  const reader = res.body.getReader();
-  let buf = "";
-
+  const decoder=new TextDecoder("utf-8"); const reader=res.body.getReader(); let buf="";
   while(true){
-    const {value, done} = await reader.read();
-    if(done) break;
+    const {value,done}=await reader.read(); if(done) break;
     clearTimeout(watchdog); armWatchdog(mode);
-
     buf += decoder.decode(value,{stream:true});
-    const parts = buf.split("\n\n");
+    const parts=buf.split("\n\n");
     for(let i=0;i<parts.length-1;i++){
-      const line = parts[i].trim();
-      if(!line) continue;
-      if(line.startsWith(":")) continue; // 心跳
-      if(!line.startsWith("data:")) continue;
-
+      const line=parts[i].trim(); if(!line||line.startsWith(":")||!line.startsWith("data:")) continue;
       try{
-        const payload = JSON.parse(line.slice(5).trim());
-
+        const payload=JSON.parse(line.slice(5).trim());
         if(payload.section==="boot"){
-          const tip = document.createElement("div");
-          tip.className = "card";
-          tip.innerHTML = `<div class="title">引擎已启动</div>
-                           <div class="content"><div class="muted">${escapeHtml(payload.data.msg||"正在准备…")}</div></div>`;
-          feed.prepend(tip);
-          continue;
+          const tip=document.createElement("div"); tip.className="card";
+          tip.innerHTML=`<div class="title">引擎已启动</div><div class="content"><div class="muted">${escapeHtml(payload.data.msg||"正在准备…")}</div></div>`;
+          feed.prepend(tip); continue;
         }
-
         if(payload.section==="done"){
           if(payload.data && payload.data.meta && typeof payload.data.meta.has_jd==="boolean"){
             sectionsTotal = payload.data.meta.has_jd ? 8 : 7;
           }
-          sectionsDone = sectionsTotal; updateProgress(true);
-          continue;
+          sectionsDone = sectionsTotal; updateProgress(true); continue;
         }
-
-        if(payload.error){
-          showError(payload.section, payload.error);
-        }else{
-          renderPiece(payload.section, payload.data);
-        }
+        if(payload.error){ showError(payload.section,payload.error); }
+        else{ renderPiece(payload.section,payload.data); }
         sectionsDone++; updateProgress(true);
-      }catch(e){
-        // JSON 解析失败：忽略该片段
-      }
+      }catch(e){}
     }
     buf = parts[parts.length-1];
   }
   cancelStream();
 }
 
-function cancelStream(){
-  if(controller){ controller.abort(); controller=null; }
-  clearInterval(progressTimer);
-  clearTimeout(watchdog);
-  $("#btnCancel").style.display="none";
-  const bar=$("#pgbar"); bar.style.width="100%"; bar.textContent="100%";
-}
+function cancelStream(){ if(controller){controller.abort();controller=null;} clearInterval(progressTimer); clearTimeout(watchdog); $("#btnCancel").style.display="none"; const bar=$("#pgbar"); bar.style.width="100%"; bar.textContent="100%"; }
 
-// 事件
 $("#btnGenerate").addEventListener("click", ()=>startStream("depth"));
 $("#btnGenerateFast").addEventListener("click", ()=>startStream("speed"));
 $("#btnCancel").addEventListener("click", cancelStream);
-$("#resumeFile").addEventListener("change", async (e)=>{
-  const f=e.target.files[0]; if(!f) return; const fd=new FormData(); fd.append("file", f);
-  const r=await fetch("/extract-text",{method:"POST",body:fd}); const j=await r.json();
-  if(j.ok) $("#resumeText").value=j.text||"";
-});
+$("#resumeFile").addEventListener("change", async (e)=>{const f=e.target.files[0]; if(!f) return; const fd=new FormData(); fd.append("file",f); const r=await fetch("/extract-text",{method:"POST",body:fd}); const j=await r.json(); if(j.ok) $("#resumeText").value=j.text||"";});
 </script>
 </body>
 </html>
