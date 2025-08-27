@@ -26,16 +26,14 @@
   .muted{color:var(--muted);font-size:12px}
   .banner{background:var(--warn);border:1px solid var(--warn-b);color:#8b6a00;padding:8px 12px;border-radius:10px;margin-bottom:12px;font-size:13px}
   .progress-wrap{background:#EEF2F3;border:1px solid var(--border);border-radius:10px;overflow:hidden;height:14px}
-  .progress-bar{height:100%;background:var(--brand);width:0%}
+  .progress-bar{height:100%;background:#0D3B2E;width:0%}
   .progress-text{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
-  .skeleton{animation:pulse 1.2s infinite ease-in-out;background:#EAECEE;height:14px;border-radius:8px;margin:8px 0}
-  @keyframes pulse{0%{opacity:.8}50%{opacity:.4}100%{opacity:.8}}
 </style>
 </head>
 <body>
   <div class="topbar">
     <div class="brand">Alsos AI Resume</div>
-    <div class="hint" id="cacheHint" style="display:none;">已加载上次结果 · <a href="#" id="btnClearCache">清空缓存</a></div>
+    <div class="hint" id="cacheHint" style="display:none;">（流式渲染，不缓存）</div>
   </div>
 
   <div class="container">
@@ -52,7 +50,7 @@
           <button class="btn btn-primary" id="btnGenerate">一键生成（流式）</button>
           <button class="btn btn-ghost" id="btnClear">清空输入</button>
         </div>
-        <div class="muted">提示：生成过程中会逐步出现各模块。</div>
+        <div class="muted">生成过程各模块会逐步出现。</div>
       </div>
     </div>
 
@@ -61,7 +59,7 @@
 
 <script>
 const $ = s => document.querySelector(s);
-const feed = $("#feed"); const cacheKey = "alsos_last_report_stream_v1";
+const feed = $("#feed");
 const escapeHtml = s => (s||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
 function card(id, title, inner=""){
@@ -84,21 +82,52 @@ function progressCard(){
 
 function renderStreamPiece(evt){
   const {section, data} = evt;
+
   if(section==="summary_highlights"){
     card("card-overview","📌 概览", `<div class="banner">引擎：Alsos AI Resume</div>`);
     card("card-summary","📝 简历 Summary 概要", `<p>${escapeHtml(data.summary||"")}</p>`);
     const hl = data.highlights||[];
     card("card-highlights","🌟 职业亮点", hl.length? `<ul>${hl.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>`:"<div class='muted'>亮点待补充</div>");
   }
+
   if(section==="improvements"){
-    const list = (data.resume_improvements||[]).map((it,i)=>`
+    const imps = data.resume_improvements||[];
+    const html = imps.map((it,i)=>`
       <div style="margin-bottom:10px">
         <div><b>${i+1}. 问题点：</b>${escapeHtml(it.issue||"")}</div>
         <div><b>改进方案：</b>${escapeHtml(it.fix||"")}</div>
         <div class="muted"><b>原因：</b>${escapeHtml(it.why||"")}</div>
       </div>`).join("");
-    card("card-improve","🔧 简历优化建议", list);
+    card("card-improve","🔧 简历优化建议", html);
   }
+
+  /* 新：职业轨迹诊断（跳槽频繁/断层/教育弱/单一文化等） */
+  if(section==="career_diagnosis"){
+    const items = (data.career_diagnosis||[]).map((it,i)=>`
+      <div style="margin-bottom:10px">
+        <div><b>${i+1}. 发现：</b>${escapeHtml(it.issue||"")}</div>
+        <div><b>风险：</b>${escapeHtml(it.risk||"")}</div>
+        <div class="muted"><b>应对策略：</b>${escapeHtml(it.advice||"")}</div>
+      </div>`).join("");
+    card("card-trajectory","🧭 职业轨迹诊断", items || "<div class='muted'>未检出明显轨迹风险</div>");
+  }
+
+  /* 新：Level 判定与职业路径 */
+  if(section==="career_level"){
+    const a = data.career_level_analysis||{};
+    const focus = a.interview_focus||{};
+    const html = `
+      <div><b>判定 Level：</b>${escapeHtml(a.level||"-")} <span class="muted">（理由：${escapeHtml(a.reason||"-")}）</span></div>
+      <div style="margin-top:8px"><b>发展路径建议：</b><ul>${(a.path||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+      <div style="margin-top:8px"><b>不同 Level 面试关注点：</b>
+        <div><i>Junior</i><ul>${(focus.junior||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+        <div><i>Middle</i><ul>${(focus.middle||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+        <div><i>Senior</i><ul>${(focus.senior||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+        <div><i>Executive</i><ul>${(focus.executive||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+      </div>`;
+    card("card-level","🏷️ 职业 Level 判定与路径", html);
+  }
+
   if(section==="keywords_career"){
     const kw = data.keywords||[];
     card("card-keywords","🔑 核心关键词", kw.length? pillList(kw):"<div class='muted'>关键词不足</div>");
@@ -109,6 +138,7 @@ function renderStreamPiece(evt){
       <div><b>长期：</b><ul>${(cs.long_term||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`;
     card("card-career","📈 求职方向（策略化）", career);
   }
+
   if(section==="interview"){
     const ih = data.interview_handbook||{};
     const html = `
@@ -127,6 +157,7 @@ function renderStreamPiece(evt){
       </div>`;
     card("card-interview","📖 面试手册", html);
   }
+
   if(section==="ats"){
     const ats = data.ats||{};
     if(!ats.enabled){
@@ -145,12 +176,13 @@ function renderStreamPiece(evt){
           <div><b>教育</b>${bar(ats.sub_scores?.education||0)}<div class="muted">${(rs.education||[]).join(" · ")}</div></div>
           <div><b>关键词</b>${bar(ats.sub_scores?.keywords||0)}<div class="muted">${(rs.keywords||[]).join(" · ")}</div></div>
         </div>
-        <div style="margin-top:8px;"><b>缺口关键词：</b>${pillList(ats.gap_keywords||[])}</div>
+        <div style="margin-top:8px;"><b>缺口关键词：</b>${(ats.gap_keywords||[]).map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join("")}</div>
         <div style="margin-top:8px;"><b>优化建议：</b><ul>${(ats.improvement_advice||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
       `;
       card("card-ats","📊 ATS 匹配", html);
     }
   }
+
   if(section==="salary"){
     const s = data.salary_insights||{}, c = s.currency||"CNY";
     const line = (label,val,min,max)=>{
@@ -169,6 +201,7 @@ function renderStreamPiece(evt){
       <div class="muted">${escapeHtml(s.notes||"模型估算，供参考")}</div>`;
     card("card-salary","💰 薪酬估算", html);
   }
+
   if(section==="done"){
     const ms = data.meta?.elapsed_ms || 0;
     const el = document.getElementById("card-overview")?.querySelector(".content");
@@ -186,8 +219,9 @@ async function startStream(){
     target_title: $("#targetTitle").value.trim(),
     target_location: $("#targetLocation").value.trim(),
     target_industry: $("#targetIndustry").value.trim()
+    // 如需强制模式：body.model = "speed" 或 "depth"
   };
-  if(!body.resume_text) { alert("请粘贴简历文本或上传文件"); return; }
+  if(!body.resume_text){ alert("请粘贴简历文本或上传文件"); return; }
 
   const res = await fetch("/optimize_stream",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   if(!res.ok){ progress.finish(); feed.innerHTML = `<div class="card"><div class="title">错误</div><div class="content">服务暂不可用</div></div>`; return; }
@@ -213,15 +247,11 @@ async function startStream(){
     buf = parts[parts.length-1];
   }
   progress.finish();
-
-  // 缓存：把当前页面 DOM 不缓存，存结构化数据（可选：拼整体对象）
-  // 这里简化：不做合并缓存，留给后续版本
 }
 
 // 事件
 $("#btnGenerate").addEventListener("click", startStream);
 $("#btnClear").addEventListener("click", ()=>{$("#resumeText").value="";$("#targetTitle").value="";$("#targetLocation").value="";$("#targetIndustry").value="";$("#jobDescription").value="";});
-$("#btnClearCache").addEventListener("click",(e)=>{e.preventDefault();localStorage.removeItem(cacheKey);$("#cacheHint").style.display="none";});
 $("#resumeFile").addEventListener("change", async (e)=>{
   const f=e.target.files[0]; if(!f) return; const fd=new FormData(); fd.append("file", f);
   const r=await fetch("/extract-text",{method:"POST",body:fd}); const j=await r.json();
