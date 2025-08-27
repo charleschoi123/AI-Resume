@@ -104,9 +104,10 @@ def _extract_json(text: str):
         raise ValueError("未找到有效 JSON")
     return json.loads(m.group(0))
 
+# ⛑ 修复点：保留 model 在 payload 中，不再 pop 掉
 def call_llm(payload, json_mode=True):
-    """同步调用；由线程池并发调度"""
-    model = payload.pop("model")
+    if not payload.get("model"):
+        raise RuntimeError("缺少模型参数：payload['model'] 未设置")
     url = LLM_API_BASE.rstrip("/") + "/v1/chat/completions"
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
@@ -149,7 +150,7 @@ def optimize_stream():
     target_industry = clean_text(data.get("target_industry",""))
     job_description = compress_context(truncate(data.get("job_description",""), MAX_JD_CHARS), 6000)
 
-    # 仍保留可选开关：speed=chat / depth=reasoner；未传则默认 reasoner
+    # 可选开关：speed=chat / depth=reasoner；未传则默认 reasoner
     model_choice = (data.get("model") or "").strip().lower()
     if model_choice in ("speed","fast"):
         model = "deepseek-chat"; per_call_tokens = 3000
@@ -158,6 +159,9 @@ def optimize_stream():
     else:
         model = DEFAULT_MODEL
         per_call_tokens = 12000 if "reasoner" in model else 6000
+
+    if not LLM_API_KEY:
+        return jsonify({"ok": False, "error": "未配置 LLM API key"}), 500
 
     if not resume_text:
         return jsonify({"ok": False, "error": "请粘贴简历文本或上传文件"}), 400
@@ -178,7 +182,7 @@ def optimize_stream():
         raw = json.dumps(base_user, ensure_ascii=False) + f"|{section}|{model}"
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
-    # prompts（含新模块）
+    # prompts（含职业轨迹诊断 & Level）
     prompts = {
         "summary_highlights": f"""你是"{BRAND_NAME}"。仅生成 JSON：
 {{"summary":"<160-220字职业概要>","highlights":["…"]}}
