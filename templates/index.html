@@ -33,7 +33,7 @@
 <body>
   <div class="topbar">
     <div class="brand">Alsos AI Resume</div>
-    <div class="hint" id="cacheHint" style="display:none;">（流式渲染，不缓存）</div>
+    <div class="hint">默认思考模式（内容更深入）</div>
   </div>
 
   <div class="container">
@@ -50,7 +50,7 @@
           <button class="btn btn-primary" id="btnGenerate">一键生成（流式）</button>
           <button class="btn btn-ghost" id="btnClear">清空输入</button>
         </div>
-        <div class="muted">生成过程各模块会逐步出现。</div>
+        <div class="muted">生成过程中模块将陆续出现；长文档需要更久。</div>
       </div>
     </div>
 
@@ -80,6 +80,27 @@ function progressCard(){
   return {finish:()=>{clearInterval(timer); bar.style.width="100%";}};
 }
 
+/* ===== 错误展示（新增） ===== */
+const titleMap = {
+  summary_highlights:"概览 / 亮点",
+  improvements:"简历优化建议",
+  career_diagnosis:"职业轨迹诊断",
+  career_level:"Level 判定与路径",
+  keywords_career:"关键词与求职方向",
+  interview:"面试手册",
+  ats:"ATS 匹配",
+  salary:"薪酬估算"
+};
+function showError(section, msg){
+  const name = titleMap[section] || section;
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = `<div class="title">⚠️ ${name} 生成失败</div>
+    <div class="content"><div class="muted">${escapeHtml(msg||"未知错误")}</div></div>`;
+  feed.appendChild(el);
+}
+
+/* ===== 正常渲染 ===== */
 function renderStreamPiece(evt){
   const {section, data} = evt;
 
@@ -101,7 +122,6 @@ function renderStreamPiece(evt){
     card("card-improve","🔧 简历优化建议", html);
   }
 
-  /* 新：职业轨迹诊断（跳槽频繁/断层/教育弱/单一文化等） */
   if(section==="career_diagnosis"){
     const items = (data.career_diagnosis||[]).map((it,i)=>`
       <div style="margin-bottom:10px">
@@ -112,7 +132,6 @@ function renderStreamPiece(evt){
     card("card-trajectory","🧭 职业轨迹诊断", items || "<div class='muted'>未检出明显轨迹风险</div>");
   }
 
-  /* 新：Level 判定与职业路径 */
   if(section==="career_level"){
     const a = data.career_level_analysis||{};
     const focus = a.interview_focus||{};
@@ -219,7 +238,7 @@ async function startStream(){
     target_title: $("#targetTitle").value.trim(),
     target_location: $("#targetLocation").value.trim(),
     target_industry: $("#targetIndustry").value.trim()
-    // 如需强制模式：body.model = "speed" 或 "depth"
+    // 如需强制：body.model = "depth"  (默认已是思考模式)
   };
   if(!body.resume_text){ alert("请粘贴简历文本或上传文件"); return; }
 
@@ -240,6 +259,7 @@ async function startStream(){
       if(line.startsWith("data:")){
         try{
           const payload = JSON.parse(line.slice(5).trim());
+          if(payload.error){ showError(payload.section, payload.error); continue; }
           renderStreamPiece(payload);
         }catch(e){}
       }
