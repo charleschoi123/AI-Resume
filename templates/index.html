@@ -47,9 +47,10 @@
 
   .error{background:#fff1f2;border:1px solid #fecdd3;color:#7f1d1d;border-radius:8px;padding:8px 10px}
 
-  /* 关键：固定右侧区域在第二列 */
-  .progress-card{grid-column:2 / -1}
-  #feed{grid-column:2 / -1; display:flex; flex-direction:column; gap:16px}
+  /* 右侧整体容器：放进度 + 输出，避免留白 */
+  .right{grid-column:2 / -1; display:flex; flex-direction:column; gap:16px; align-items:stretch}
+  .progress-card{margin-bottom:0}
+  #feed{display:flex; flex-direction:column; gap:16px}
 </style>
 </head>
 <body>
@@ -71,6 +72,7 @@
         <div class="row"><textarea id="jobDescription" placeholder="目标职位 JD（可选，用于 ATS）"></textarea></div>
         <div class="row" style="gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary" id="btnGenerate">一键生成（思考）</button>
+          <button class="btn btn-ghost" id="btnBalanced">平衡模式（提速）</button>
           <button class="btn btn-ghost" id="btnGenerateFast">极速模式（较快）</button>
           <button class="btn btn-danger" id="btnCancel" style="display:none">取消生成</button>
         </div>
@@ -78,16 +80,18 @@
       </div>
     </div>
 
-    <!-- 右列：进度 + 输出 -->
-    <div class="card progress-card">
-      <div class="section-title">正在分析简历</div>
-      <div class="content">
-        <div class="progress-wrap"><div class="progress-bar" id="pgbar">0%</div></div>
-        <div class="progress-text" id="pgtext">莫着急、莫着急，你的简历很精彩，容我认真拜读～</div>
+    <!-- 右列：进度 + 输出（同一格，避免空白） -->
+    <div class="right">
+      <div class="card progress-card">
+        <div class="section-title">正在分析简历</div>
+        <div class="content">
+          <div class="progress-wrap"><div class="progress-bar" id="pgbar">0%</div></div>
+          <div class="progress-text" id="pgtext">莫着急、莫着急，你的简历很精彩，容我认真拜读～</div>
+        </div>
       </div>
-    </div>
 
-    <div id="feed"></div>
+      <div id="feed"></div>
+    </div>
   </div>
 
 <script>
@@ -185,7 +189,7 @@ function armWatchdog(mode){
     if(slowHintShown) return; slowHintShown=true;
     const tip=document.createElement("div"); tip.className="card";
     tip.innerHTML=`<div class="title">⏳ 正在努力生成</div><div class="content">
-      <div class="muted">思考模式在长文档情况下可能较慢。你可以继续等待，或尝试“极速模式”以先获得首版报告。</div>
+      <div class="muted">思考模式在长文档情况下可能较慢。你可以继续等待，或尝试“平衡/极速模式”。</div>
       <div style="margin-top:8px"><button class="btn btn-ghost" id="retryFast">切换极速模式重试</button></div></div>`;
     feed.prepend(tip); $("#retryFast").onclick=()=>{ cancelStream(); startStream("speed"); };
   }, 90000);
@@ -207,7 +211,7 @@ async function startStream(mode="depth"){
     target_title: $("#targetTitle").value.trim(),
     target_location: $("#targetLocation").value.trim(),
     target_industry: $("#targetIndustry").value.trim(),
-    model: mode==="speed" ? "speed" : "depth"
+    model: mode
   };
   if(!body.resume_text){ alert("请粘贴简历文本或上传文件"); cancelStream(); return; }
 
@@ -248,6 +252,7 @@ async function startStream(mode="depth"){
 function cancelStream(){ if(controller){controller.abort();controller=null;} clearInterval(progressTimer); clearTimeout(watchdog); $("#btnCancel").style.display="none"; const bar=$("#pgbar"); bar.style.width="100%"; bar.textContent="100%"; }
 
 $("#btnGenerate").addEventListener("click", ()=>startStream("depth"));
+$("#btnBalanced").addEventListener("click", ()=>startStream("balanced"));
 $("#btnGenerateFast").addEventListener("click", ()=>startStream("speed"));
 $("#btnCancel").addEventListener("click", cancelStream);
 $("#resumeFile").addEventListener("change", async (e)=>{const f=e.target.files[0]; if(!f) return; const fd=new FormData(); fd.append("file",f); const r=await fetch("/extract-text",{method:"POST",body:fd}); const j=await r.json(); if(j.ok) $("#resumeText").value=j.text||"";});
