@@ -1,10 +1,9 @@
-import os, time, json, re, hashlib, threading, queue, datetime
+import os, time, json, re, hashlib, threading, queue, datetime, uuid
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
 
-# 可选：docx 解析
 try:
     from docx import Document
     HAS_DOCX = True
@@ -13,20 +12,20 @@ except Exception:
 
 app = Flask(__name__)
 
-# =============== 环境配置 ===============
+# ------------ 环境 ------------
 LLM_API_BASE = os.getenv("LLM_API_BASE") or os.getenv("OPENAI_BASE_URL") or "https://api.deepseek.com"
 LLM_API_KEY  = os.getenv("LLM_API_KEY")  or os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
 DEFAULT_MODEL = os.getenv("LLM_MODEL") or os.getenv("MODEL_NAME") or "deepseek-reasoner"
 
 MAX_TOKENS_DEFAULT = int(os.getenv("MAX_TOKENS", "8000"))
-REQUEST_TIMEOUT     = int(os.getenv("REQUEST_TIMEOUT", "1200"))  # API 总超时
-SECTION_TIMEOUT     = int(os.getenv("SECTION_TIMEOUT", "600"))   # 单段超时
+REQUEST_TIMEOUT     = int(os.getenv("REQUEST_TIMEOUT", "1200"))
+SECTION_TIMEOUT     = int(os.getenv("SECTION_TIMEOUT", "600"))
 MAX_TEXT_CHARS      = int(os.getenv("MAX_TEXT_CHARS", "18000"))
 MAX_JD_CHARS        = int(os.getenv("MAX_JD_CHARS", "10000"))
 
 BRAND_NAME = "Alsos AI Resume"
 
-# =============== 简易 LRU 缓存 ===============
+# ------------ 简易缓存 ------------
 class LRUCache:
     def __init__(self, capacity=200):
         self.cap = capacity
@@ -47,7 +46,7 @@ class LRUCache:
 
 cache = LRUCache(200)
 
-# =============== 工具函数 ===============
+# ------------ 工具 ------------
 def clean_text(s: str) -> str:
     if not s: return ""
     s = s.replace("\r", "\n")
@@ -103,65 +102,101 @@ def call_llm(payload, json_mode=True):
 def make_payload(messages, model, temperature=0.25, max_tokens=MAX_TOKENS_DEFAULT):
     return {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
 
-# =============== Level 锚点（预分析） ===============
+# ------------ 预分析：年限/跳槽/教育/管理/ JD 诉求 ------------
 LEVEL_ORDER = {"Junior":0, "Middle":1, "Senior":2, "Executive":3}
 
-SENIOR_KEYWORDS = [
-    "副总裁","VP","Vice President","总监","Director","执行总监","Executive Director",
-    "负责人","Head","HRD","Chief","首席","CXO","合伙人","Partner","总经理","GM","HRVP","HR Head"
-]
-MIDDLE_KEYWORDS = ["经理","Manager","资深","Senior","主管","Lead","Leader","负责人"]
-
-def quick_pre_analyze(text: str):
+def _guess_year_span(text: str):
     now = datetime.datetime.utcnow().year
-    years = re.findall(r"(19|20)\d{2}", text)
-    years = [int(y if len(y)==4 else "2000") for y in years]
-    years = [y for y in years if 1980 <= y <= now]
-    span = 0
-    if years:
-        span = max(years) - min(years) + 1
-        span = max(1, min(span, 40))
+    yrs = [int(y) for y in re.findall(r"(19|20)\d{2}", text)]
+    yrs = [y if y>1900 else 2000 for y in yrs]
+    yrs = [y for y in yrs if 1980 <= y <= now]
+    if not yrs: return 0
+    return max(1, min(40, max(yrs)-min(yrs)+1))
 
-    lower_txt = text.lower()
+def _hop_signal(text: str):
+    # 粗略：统计形如 2018-2020 / 2018.09-2020.06 / 2018/2020 这种区段数
+    ranges = re.findall(r"(20\d{2})(?:[./-]\d{1,2})?\s*[-–~]\s*(20\d{2})", text)
+    total = len(ranges)
+    # 近5年切片（粗略把包含近5年的区段计数）
+    now = datetime.datetime.utcnow().year
+    recent5 = sum(1 for a,b in ranges if int(b) >= now-5)
+    longest = 0
+    for a,b in ranges:
+        try:
+            longest = max(longest, int(b)-int(a)+1)
+        except: pass
+    # 判定：近5年>=3 次 → 可疑；最长任期>=3 年 & 近5年<=1 → 稳定加分
+    hop_suspect = recent5 >= 3
+    stability_plus = (longest >= 3 and recent5 <= 1) or (total <= 2 and _guess_year_span(text)>=6)
+    return {"total_ranges": total, "recent5": recent5, "longest_span": longest,
+            "hop_suspect": hop_suspect, "stability_plus": stability_plus}
 
-    if any(kw.lower() in lower_txt for kw in ["vp","vice president","chief","首席","cxo","hrvp","合伙人","partner"]):
-        anchor = "Executive"
-        reason = "检测到 VP/Chief/合伙人等高阶头衔"
-    elif any(kw.lower() in lower_txt for kw in ["总监","director","hrd","head","负责人","executive director"]) or span >= 12:
-        anchor = "Senior"
-        reason = "总监/HRD/Head 等头衔或年限≥12"
-    elif any(kw.lower() in lower_txt for kw in ["经理","manager","资深","senior","主管","lead"]) or span >= 6:
-        anchor = "Middle"
-        reason = "经理/资深/主管等头衔或年限≥6"
-    elif span >= 3:
-        anchor = "Middle"
-        reason = "年限≥3，保底不低于 Middle"
+def _edu_signal(text: str):
+    t = text.lower()
+    elite = any(k in t for k in ["985","211","双一流","qs","top 100","top100","top 200","top200"])
+    edu_level = "bachelor"
+    if re.search(r"博士|phd", text, re.I): edu_level="phd"
+    elif re.search(r"硕士|master", text, re.I): edu_level="master"
+    return {"elite": elite, "edu_level": edu_level}
+
+def _mgmt_signal(text: str):
+    t = text.lower()
+    num = re.search(r"(?:带领|管理|负责人|lead|led|managed|manager of|direct reports)\D*(\d{1,3})", text, re.I)
+    mgmt = bool(re.search(r"管理|带领|团队|leader|lead|managed|head of|负责人", text, re.I))
+    span = int(num.group(1)) if num else 0
+    return {"mgmt": mgmt, "mgmt_span": span, "mgmt_suspect": (not mgmt or span==0)}
+
+def _jd_require(jd: str):
+    if not jd: return {"need_phd": False, "need_master": False, "need_elite": False, "elite_floor": None}
+    need_phd   = bool(re.search(r"博士|phd", jd, re.I))
+    need_master= bool(re.search(r"硕士|master", jd, re.I))
+    elite = bool(re.search(r"985|211|双一流|qs ?(top)? ?(100|200)|top ?(100|200)", jd, re.I))
+    floor = None
+    m = re.search(r"qs ?top ?(100|200)", jd, re.I)
+    if m: floor = int(m.group(1))
+    return {"need_phd":need_phd, "need_master":need_master, "need_elite":elite, "elite_floor":floor}
+
+def quick_pre_analyze(resume_text: str, jd_text: str):
+    span = _guess_year_span(resume_text)
+    hop = _hop_signal(resume_text)
+    edu = _edu_signal(resume_text)
+    mg  = _mgmt_signal(resume_text)
+    jd  = _jd_require(jd_text)
+    # level anchor（更稳健）
+    if edu["edu_level"]=="phd" or re.search(r"vp|chief|合伙人|hrvp|总监|director|head|hrd", resume_text, re.I):
+        anchor="Senior"
+    elif span>=6:
+        anchor="Middle"
+    elif span>=3:
+        anchor="Middle"
     else:
-        anchor = "Junior"
-        reason = "年限较短且未检测到中高阶头衔"
-
+        anchor="Junior"
+    # 若出现 VP / Chief / 合伙人，直接 Executive 候选
+    if re.search(r"vp|vice president|chief|cxo|合伙人|partner", resume_text, re.I):
+        anchor="Executive"
     return {
         "years_span_estimate": span,
         "anchor_min_level": anchor,
-        "anchor_reason": reason
+        "anchor_reason": "基于年限/头衔快速锚定",
+        "hop": hop,
+        "edu": edu,
+        "mgmt": mg,
+        "jd": jd
     }
 
-# =============== 降级/补位 ===============
+# ------------ 降级 ------------
 def _fallback_from_raw(raw: str, section: str):
-    return {"_raw_preview": (raw or "")[:1200], "_note": "解析失败，展示原文片段供参考。"}
+    return {"_raw_preview": (raw or "")[:1000], "_note": "解析失败，展示原文片段供参考。"}
 
 def _ensure_nonempty(section: str, obj: dict):
     if section == "summary_highlights":
         obj.setdefault("summary", "（待补充）")
-        obj.setdefault("highlights", ["（待补充）", "建议继续完善可量化成果（金额/规模/增速/覆盖度等）"])
+        obj.setdefault("highlights", ["（待补充）"])
     if section == "improvements":
         arr = obj.setdefault("resume_improvements", [])
-        if not arr:
-            arr.append({"issue":"（待补充）","fix":"补充可执行的改进动作","why":"说明原因与预期影响"})
+        if not arr: arr.append({"issue":"（待补充）","fix":"补充可执行动作","why":"补充原因"})
     if section == "career_diagnosis":
-        arr = obj.setdefault("career_diagnosis", [])
-        if not arr:
-            arr.append({"issue":"（暂未检出明显风险）","risk":"","advice":"保持稳定产出，丰富外显成果"})
+        obj.setdefault("career_diagnosis", [])
     if section == "career_level":
         obj.setdefault("career_level_analysis", {"level":"-","reason":"（待补充）","path":[],"interview_focus":{}})
     if section == "personalized_strategy":
@@ -174,7 +209,7 @@ def _ensure_nonempty(section: str, obj: dict):
         obj.setdefault("salary_insights", {"title":"","city":"","currency":"CNY","low":0,"mid":0,"high":0,"factors":[],"notes":"模型估算，供参考"})
     return obj
 
-# =============== 页面 ===============
+# ------------ 页面 ------------
 @app.route("/")
 def index():
     return render_template("index.html", brand=BRAND_NAME)
@@ -193,20 +228,16 @@ def extract_text():
         return jsonify({"ok": False, "error": "仅支持 .txt / .docx"}), 400
     return jsonify({"ok": True, "text": clean_text(text)})
 
-# =============== 模型路由（平衡模式） ===============
+# ------------ 模型路由（平衡提速） ------------
 def model_for(section: str, mode: str):
-    # 极速：全 chat
-    if mode in ("speed", "fast"):
-        return "deepseek-chat", 2800
-    # 平衡：只对“需要推理”的块用 reasoner
+    if mode in ("speed","fast"): return "deepseek-chat", 2600
     if mode == "balanced":
-        if section in ["personalized_strategy", "interview", "career_diagnosis", "career_level"]:
-            return "deepseek-reasoner", 6000
-        return "deepseek-chat", 2800
-    # 深度：全 reasoner
-    return "deepseek-reasoner", 8000
+        if section in ["personalized_strategy","interview","career_diagnosis","career_level"]:
+            return "deepseek-reasoner", 5200
+        return "deepseek-chat", 2400
+    return "deepseek-reasoner", 7200
 
-# =============== 主流程（SSE） ===============
+# ------------ 主流程（SSE 流式） ------------
 @app.route("/optimize_stream", methods=["POST"])
 def optimize_stream():
     t0 = time.time()
@@ -216,10 +247,8 @@ def optimize_stream():
     target_title    = clean_text(data.get("target_title",""))
     target_location = clean_text(data.get("target_location",""))
     target_industry = clean_text(data.get("target_industry",""))
+    mode = (data.get("model") or "").strip().lower()
 
-    mode = (data.get("model") or "").strip().lower()  # depth / balanced / speed
-
-    # 加速：平衡/极速模式时做轻压缩
     if mode in ("speed","fast","balanced"):
         resume_text = compress_context(resume_text, 6500)
         job_description = compress_context(job_description, 4500)
@@ -231,7 +260,8 @@ def optimize_stream():
     if is_text_too_short(resume_text):
         return jsonify({"ok": False, "error": "简历文本过短（≥500 中文字符或 ≥300 英文词）"}), 400
 
-    pre = quick_pre_analyze(resume_text)
+    pre = quick_pre_analyze(resume_text, job_description)
+    has_jd = bool(job_description)
 
     base_user = {
         "resume_text": resume_text,
@@ -241,50 +271,50 @@ def optimize_stream():
         "target_industry": target_industry,
         "pre_analysis": pre
     }
-    has_jd = bool(job_description)
 
-    # ---------- Prompts ----------
+    # ------------ 更克制的 Prompts（限长 + 条件输出） ------------
     prompts = {
-        "summary_highlights": f"""你是"{BRAND_NAME}"的资深猎头。仅输出 JSON（中文）：
-{{"summary":"<160-220字职业概要>","highlights":["…"]}}
-- 必须中文、温和、专业；
-- highlights ≥ 8 条；每条 20-60 字；包含场景/动作/结果（数字/规模/指标）；拒绝空话。""",
+        "summary_highlights": f"""你是"{BRAND_NAME}"的资深猎头。输出紧凑 JSON（中文）：
+{{"summary":"<120-160字职业概要>","highlights":["…"]}}
+- 语气温和专业，禁止空话；
+- highlights ≤ 6 条，每条 16-36 字，含“动作+结果(数值/规模)”；
+- 若 pre_analysis.hop.stability_plus 为真，summary 中明确“稳定性强”；""",
 
-        "improvements": """仅输出 JSON（中文）：
+        "improvements": """输出紧凑 JSON（中文）：
 {"resume_improvements":[{"issue":"","fix":"","why":""}, ...]}
-- 至少 10 条；必须“问题点→改进方案→原因解释”三段齐全、具体、可执行；禁止空话。""",
+- 仅给“最重要的 Top6”改进点；每项为何≤30字，fix 可执行；""",
 
-        "career_diagnosis": """仅输出 JSON（中文）：
+        "career_diagnosis": """仅在证据成立时输出。紧凑 JSON（中文）：
 {"career_diagnosis":[{"issue":"","risk":"","advice":""}, ...]}
-- 6–10 条；围绕：跳槽频繁、履历断层、教育一般、单一文化/行业、职责堆砌、管理跨度不足、成果对外可见度低、平台选择偏差；
-- “advice”必须是具体动作（如“稳定 2-3 年并拿到 X 类量化成果；对外发布作品集”）。""",
+规则：
+- “跳槽频繁”仅当 pre_analysis.hop.hop_suspect 为真（近5年≥3次）才出现；建议先稳定 2-3 年并拿到量化成果；
+- 若 pre_analysis.hop.stability_plus 为真，加入“稳定性强”的正向项；
+- 教育：若 JD 要求博士/QS/985/211 且候选达不到→提示“可能存在差距”；无 JD 要求时，若非名校仅表述“可能竞争力一般/不足”；若名校/研究生→表述“教育背景具备竞争力”；
+- 管理跨度：仅当 pre_analysis.mgmt.mgmt_suspect 为真时出现；否则不提；
+- 每条 ≤ 40 字，总数 3-6 条；""",
 
-        "career_level": """仅输出 JSON（中文）：
+        "career_level": """输出 JSON（中文）：
 {"career_level_analysis":{
   "level":"Junior|Middle|Senior|Executive",
-  "reason":"≤60字",
+  "reason":"≤40字",
   "path":["…","…","…"],
   "interview_focus":{"junior":["…"],"middle":["…"],"senior":["…"],"executive":["…"]}
 }}
-- 你会收到 pre_analysis.anchor_min_level（Level 下限），判定不得低于该下限；
-- 若文本出现冲突，请解释原因，但仍不低于该下限；
-- 若年限≥12 或出现“总监/HRD/Head/Director/VP/Chief/合伙人”等信号，最低为 Senior；出现 VP/Chief/合伙人且负战略职责，可判 Executive；""",
+- Level 不得低于 pre_analysis.anchor_min_level；
+- 若稳定性强或管理跨度小，reason 简短点出；
+- path ≤3 条、每条 ≤ 20 字；interview_focus 各 ≤4 条；""",
 
-        "personalized_strategy": """基于简历、JD（如有）、【职业轨迹诊断】、【Level 判定】与【pre_analysis】做“个性化处方”。仅输出 JSON（中文）：
+        "personalized_strategy": """输出 JSON（中文）：
 {"strategy":{
-  "assumptions":"≤80字",
-  "short_term":[
-    "现状评估（点名关键风险点）","技能与经验补齐（点名技能/证书/项目/作品集）",
-    "风险规避（如跳槽频繁→建议稳定 2-3 年并拿到量化成果；若断层→统一解释模板+复位计划）",
-    "小目标设计（3-6 个月，含定量指标）"
-  ],
-  "mid_term":["目标角色与行业匹配","路径拆解（职责→交付物→量化目标）","关键拐点（带团队/跨部门/对外成果/跨文化）"],
-  "long_term":["角色演进的里程碑","平台选择取舍逻辑","风险与弹性（行业周期/转型预案）"],
-  "if_job_hopping":["若‘跳槽频繁’成立：给出统一叙事模板（承认→内/外因→复盘→稳定计划）与下一份工作沉淀清单"]
+  "assumptions":"≤60字",
+  "short_term":["现状评估(命中项)","技能/证书补齐","风险规避(若跳槽频繁给统一叙述模板)","3-6个月小目标(量化)"],
+  "mid_term":["目标角色/行业匹配","路径拆解(职责→交付物→指标)","关键拐点(带团队/跨部门/作品集)"],
+  "long_term":["角色演进里程碑","平台选择逻辑","风险与弹性(行业周期/转型预案)"],
+  "if_job_hopping":["仅当 pre_analysis.hop.hop_suspect 为真时输出：统一叙述模板+复位计划"]
 }}
-- 条目必须具体可执行；短期应服务于中长期目标；禁止空话。""",
+- 每列 3-5 条，禁止空话，条目≤24字；""",
 
-        "interview": """仅输出 JSON（中文）：
+        "interview": """输出 JSON（中文）：
 {"interview_handbook":{
   "level":"Junior|Middle|Senior|Executive",
   "answer_logic":["…","…","…","…","…"],
@@ -295,22 +325,22 @@ def optimize_stream():
     {"project_title":"","question":"","how_to_answer":["…","…","…"]}
   ],
   "risk_mitigation":[
-    "跳槽频繁：统一解释模板……",
-    "履历断层：正面叙述……+ 复位动作……",
-    "教育一般：以作品集/成果弥补……"
+    "若跳槽频繁：统一解释模板……",
+    "若履历断层：正面叙述……+ 复位动作……",
+    "若教育不达标：以成果/作品集弥补……"
   ]
 }}
-- 仅生成候选人对应 level 的手册；各列表至少 5/5/3。""",
+- 仅生成对应 level；每条尽量 ≤ 26 字；""",
 
-        "ats": """仅输出 JSON（中文）：
+        "ats": """输出 JSON（中文）：
 {"ats":{"enabled":true,"total_score":0,"sub_scores":{"skills":0,"experience":0,"education":0,"keywords":0},
  "reasons":{"skills":["…"],"experience":["…"],"education":["…"],"keywords":["…"]},
  "gap_keywords":["…"],"improvement_advice":["…"]}}
-- reasons 各 3–5 条；gap_keywords ≥ 10；improvement_advice ≥ 6，尽量贴 JD。""",
+- reasons 各 ≤3 条；gap_keywords ≤10；advice ≤6 条；""",
 
-        "salary": """仅输出 JSON（中文）：
+        "salary": """输出 JSON（中文）：
 {"salary_insights":{"title":"","city":"","currency":"CNY","low":0,"mid":0,"high":0,"factors":["…"],"notes":"模型估算，供参考"}}
-- low < mid < high；给 5 个影响因子（体量/区域/热度/作品集/是否管理岗等）。"""
+- low < mid < high；factors ≤5 条；"""
     }
 
     phase1 = ["summary_highlights","improvements","career_diagnosis","career_level"]
@@ -332,7 +362,6 @@ def optimize_stream():
 
         messages=[{"role":"system","content":prompts[section]},
                   {"role":"user","content":json.dumps(user_payload,ensure_ascii=False)}]
-
         sec_model, sec_tokens = model_for(section, mode)
         payload = make_payload(messages, model=sec_model, max_tokens=sec_tokens)
 
@@ -340,22 +369,20 @@ def optimize_stream():
             with ThreadPoolExecutor(max_workers=1) as inner:
                 fut = inner.submit(lambda: call_llm(payload, json_mode=True))
                 raw = fut.result(timeout=SECTION_TIMEOUT)
-
             try:
                 obj = _extract_json(raw)
             except Exception:
                 obj = _fallback_from_raw(raw, section)
-
             obj = _ensure_nonempty(section, obj)
 
-            # 低于锚点时自动纠偏
+            # 低于锚点纠偏
             if section == "career_level" and isinstance(obj.get("career_level_analysis"), dict):
                 level = obj["career_level_analysis"].get("level","-")
                 a_min = base_user["pre_analysis"]["anchor_min_level"]
                 order = LEVEL_ORDER
                 if level in order and order.get(level,0) < order.get(a_min,0):
                     obj["career_level_analysis"]["reason"] = (obj["career_level_analysis"].get("reason","") +
-                        f"（系统基于年限/头衔纠偏：最低不低于 {a_min}）")
+                        f"（锚点下限：{a_min}）")
                     obj["career_level_analysis"]["level"] = a_min
 
             cache.set(ck, obj)
@@ -365,9 +392,8 @@ def optimize_stream():
 
     def streamer():
         yield "retry: 1500\n"
-        yield 'data: {"section":"boot","data":{"msg":"引擎已启动，正在读取与拆解你的简历…"}}\n\n'
+        yield 'data: {"section":"boot","data":{"msg":"引擎已启动，正在读取与你的简历做对齐…"}}\n\n'
 
-        # Phase 1
         with ThreadPoolExecutor(max_workers=min(4,len(phase1))) as ex1:
             for sec in phase1: ex1.submit(run_section, sec)
 
@@ -380,7 +406,6 @@ def optimize_stream():
             if "error" not in item and item["section"] in ("career_diagnosis","career_level"):
                 phase1_results[item["section"]] = item["data"]
 
-        # Phase 2
         extra_ctx={"diagnosis":phase1_results.get("career_diagnosis",{}),
                    "level":phase1_results.get("career_level",{})}
         with ThreadPoolExecutor(max_workers=min(4,len(phase2))) as ex2:
